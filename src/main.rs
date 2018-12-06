@@ -6,9 +6,11 @@ extern crate serde_derive;
 extern crate uuid;
 extern crate amqp;
 extern crate chrono;
+extern crate hyper;
+extern crate itertools;
+extern crate dialoguer;
 extern crate bender_job;
 extern crate bender_mq;
-extern crate hyper;
 
 use bender_mq::BenderMQ;
 use uuid::Uuid;
@@ -17,7 +19,8 @@ use bender_mq::Channel;
 use app_dirs::*;
 use std::path::{PathBuf, Path};
 use serde_derive::{Serialize, Deserialize};
-
+use dialoguer::Confirmation;
+use std::fs;
 
 
 
@@ -45,7 +48,22 @@ fn main() {
 
             // Load the configuration (or generate one if we are a first timer)
             match config::get_config(&app_savepath){
-                Err(err) => println!("ERROR: Couldn't generate/read config file: {}", err),
+                Err(err) => {
+                    let e = format!("{}", err);
+                    if !e.contains("missing field"){
+                        println!("ERROR: Couldn't generate/read config file: {}", err);
+                    }else{
+                        println!("ERROR: The existing configuration misses a field: {}", err);
+                        let msg = "Do you want to generate a new one? (this overrides the existing configuration)";
+                        if Confirmation::new().with_text(msg).interact().unwrap(){
+                            let mut p = PathBuf::from(&app_savepath);
+                            p.push("config.json");
+                            fs::remove_file(&p).expect(format!("Error: Couldn't remove the file at {}\nPlease try to remove it manually", p.to_string_lossy()).as_str());
+                            println!("Deleted the configuration file. Run worker again for a fresh new start");
+                        }
+                    }
+
+                },
                 Ok(config) => {
                     // We sucessfullt created a config file, let's go ahead
                     println!("This Worker has the ID:             [{}]", config.id);
@@ -53,14 +71,16 @@ fn main() {
                     // For now. TODO: discover this on the bender.hfbk.net
                     let url = "amqp://localhost//".to_string();
                     println!("Listening on for AMQP traffic at:   {}", url);
+                    println!("Storing jobs at:                    {}", config.blendpath.to_string_lossy());
                     let mut channel = Channel::open_default_channel().expect(" ✖ [WORKER] Error: Couldn't aquire channel");
 
                     // Declare a Work exchange
-                    channel.create_work_queue().expect(" ✖ [QU] Error: Declaration of work queue failed");
+                    channel.create_work_queue().expect(" ✖ [WORKER] Error: Declaration of work queue failed");
 
                     // Declare a topic exchange
-                    channel.declare_topic_exchange().expect(" ✖ [QU] Error: Declaration of topic exchange failed");
+                    channel.declare_topic_exchange().expect(" ✖ [WORKER] Error: Declaration of topic exchange failed");
                     
+                    // TODO APPSAVEPATH REINSPEICHERN
 
                     // Print the space left on the Worker Machine (at the path of the Application Data)
                     system::print_space_warning(Path::new(&app_savepath), config.disklimit);
@@ -73,7 +93,7 @@ fn main() {
                     // let mut delivery_tags = Vec::<u64>::new();
                     let mut pmessage = "".to_string();
 
-                    let mut work = Work::new(config.workload);
+                    let mut work = Work::new(config.clone());
                         
 
                     loop{
@@ -84,7 +104,7 @@ fn main() {
                         // -----------------------------------------------------
                         // 2. Read Commands from the work queue and construct Work
                         //    with optimize_blend.py etc
-                        work.update(&mut channel, &config);
+                        work.update(&mut channel);
 
 
                         // -----------------------------------------------------

@@ -2,23 +2,40 @@ use ::*;
 use std::error::Error;
 use std::fs;
 use std::io::Read;
+use dialoguer::Input;
+
+
+
 
 pub type GenError = Box<std::error::Error>;
 pub type GenResult<T> = Result<T, GenError>;
 
+
+// TODO: CHECK IF BLENDER BINARY IS IN PATH!
+
+
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct Config{
+    pub bender_url: String,
     pub id: Uuid,
+    pub blendpath: PathBuf,
     pub disklimit: u64,
     pub workload: usize
 }
 
+
+
+
 impl Config{
     pub fn new() -> Self{
+        // Default for now.
+        let bender_url = "http://0.0.0.0:5000".to_string();
         Config{
-            id: Uuid::new_v4(),         // Random UUID on start, then from disk
-            disklimit: 200*1_000_000,   // In MB
-            workload: 1                 // How many frames to take at once
+            bender_url: bender_url,           // URL of the bender frontend
+            id: Uuid::new_v4(),               // Random UUID on start, then from disk
+            blendpath: PathBuf::new(),        // Path to where the blendfiles should be stored
+            disklimit: 200*1_000_000,         // In MB
+            workload: 1,                      // How many frames to take at once
         }
     }
 
@@ -45,12 +62,35 @@ impl Config{
     /// Create a new Config from the given json file
     pub fn from_file<S>(p: S) -> GenResult<Self> where S: Into<PathBuf>{
         let p = p.into();
-        let mut file = fs::File::open(p)?;
+        let mut file = fs::File::open(&p)?;
         let mut contents = String::new();
         file.read_to_string(&mut contents)?;
         let config = Self::deserialize(contents)?;
         Ok(config)
     }
+}
+
+
+
+
+/// Run the setup dialog for the blendpath
+pub fn setup_blendpath<P>(config: &mut Config, p: P) -> GenResult<()> where P: Into<PathBuf>{
+    // Create the default path
+    let mut p = p.into();
+            p.push("blendfiles");
+    let p = p.to_string_lossy().to_string();
+
+    // Display a dialog
+    let msg = "Where should the blendfiles be saved? (Press Enter for Default)";
+    let blendpath: String = Input::new().with_prompt(msg)
+                                        .default(p)
+                                        .interact()?;
+
+    config.blendpath = PathBuf::from(blendpath);
+
+    fs::create_dir_all(&config.blendpath)?;
+
+    Ok(())
 }
 
 
@@ -74,7 +114,11 @@ pub fn get_config<P>(p: P) -> GenResult<Config> where P: Into<PathBuf>{
             // Create directories on the way
             fs::create_dir_all(&d)?;
             // Get a new config
-            let config = Config::new();
+            let mut config = Config::new();
+            // Ask the user where to save files
+            while let Err(e) = setup_blendpath(&mut config, &d){
+                println!("ERROR: This is not a valid directory: {}", e);
+            }
             // Write it to file
             config.to_file(p.to_string_lossy())?;
             Ok(config)
