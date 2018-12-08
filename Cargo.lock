@@ -161,7 +161,7 @@ dependencies = [
 [[package]]
 name = "bender_mq"
 version = "0.1.0"
-source = "git+ssh://git@code.hfbk.net:4242/bendercode/bender-mq.git#26ca3407178c94d2c30b3d213728d05b6ab7d376"
+source = "git+ssh://git@code.hfbk.net:4242/bendercode/bender-mq.git#bf90950c5ea1863b1dfa2980b711453385485ec2"
 dependencies = [
  "amqp 0.1.2 (registry+https://github.com/rust-lang/crates.io-index)",
  "bender_config 0.1.0 (git+ssh://git@code.hfbk.net:4242/bendercode/bender-config.git)",
