@@ -21,6 +21,7 @@ use std::path::{PathBuf, Path};
 use serde_derive::{Serialize, Deserialize};
 use dialoguer::Confirmation;
 use std::fs;
+use std::process;
 
 
 
@@ -65,6 +66,9 @@ fn main() {
 
                 },
                 Ok(config) => {
+                    if !system::blender_in_path(){
+                        process::exit(1);
+                    }
                     // We sucessfullt created a config file, let's go ahead
                     println!("This Worker has the ID:             [{}]", config.id);
 
