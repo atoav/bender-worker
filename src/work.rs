@@ -15,7 +15,7 @@ use hyper::rt::{self, Future, Stream};
 
 
 
-
+#[derive(Debug, Clone)]
 pub struct Work{
     pub config: Config,
     pub tasks: Vec<Task>,
@@ -52,7 +52,9 @@ impl Work{
 
     /// Returns true if a new task should be added
     pub fn should_add(&self) -> bool{
-        self.tasks.len() < self.config.workload
+        self.tasks.iter()
+                  .filter(|t| t.is_waiting())
+                  .count() < self.config.workload
     }
 
     /// Returns true if there is at least one task
@@ -69,7 +71,21 @@ impl Work{
                     None => false
                 }
             },
-            none => false
+            None => false
+        }
+    }
+
+    /// Returns true if the Tasks blendfile is 
+    pub fn has_blendfile_by_id<S>(&self, id: S) -> bool where S: Into<String>{
+        let id = id.into();
+        match self.blendfiles.get(&id) {
+            Some(entry) => {
+                match entry{
+                    Some(_) => true,
+                    None => false
+                }
+            },
+            None => false
         }
     }
 
@@ -99,35 +115,60 @@ impl Work{
         }
     }
 
-    /// Moves the next Task out only if there is no Task running
+    /// Moves the next Task to self.current only if there is no Task running
     /// Only works on tasks with a constructed Command
     /// Sets the Tasks Status to Running
-    pub fn update_next_task(&mut self){
+    pub fn queue_next_task(&mut self, channel: &mut Channel){
+        // Only do this if there is no task running
         if !self.tasks.iter().any(|t| t.is_running()) {
-            let x: Option<Task> = 
-                self.tasks.into_iter()
-                          .filter(|t| self.has_blendfile(t))
-                          .filter(|t| t.command.is_constructed())
-                          .find(|t| t.is_queued())
-                          .take();
+            let mut i = 0;
+            let mut next = None;
+            // Find the first task that:
+            // - has a blendfile
+            // - has a constructed command
+            // - is queued
+            // then remove this Task from the list and tore it in next
+            while i != self.tasks.len() {
+                if self.has_blendfile(&self.tasks[i]) &&
+                   self.tasks[i].command.is_constructed() &&
+                   self.tasks[i].is_queued() &&
+                   next.is_none() {
+                    next = Some(self.tasks.remove(i));
+                } else {
+                    i += 1;
+                }
+            }
+
             // Match the result of above find operation and assign it to
             // self.current only if there is an actual Task
-            match x{
+            match next{
                 Some(mut t) => {
                     t.start();
-                    self.current = Some(t)
+                    println!(" ✚ [WORKER] Queued task [{}] for job [{}]", t.id, t.parent_id);
+                    let routing_key = format!("worker.{}", self.config.id);
+                    match channel.post_task_info(&t, routing_key){
+                        Ok(_) => (),
+                        Err(err) => eprintln!(" ✖ [WORKER] Error: Couldn't post current task to info queue: {}", err)
+                    }
+                    self.current = Some(t);
                 },
                 None => ()
             }
+        }else{
+            println!(" ✚ [WORKER] didn't get a new task because the old is running");
         }
     }
 
     /// finish the current task and push it back to tasks
     pub fn finish_current(&mut self){
-        let moved = false;
+        let mut moved = false;
+        // let c =  self.clone();
         if let Some(ref mut t) = self.current{
             t.finish();
+            println!(" ✚ [WORKER] Finished Task");
             self.tasks.push(t.clone());
+            moved = true;
+            // println!("\n{:#?}", c);
         }
 
         if moved{
@@ -140,7 +181,7 @@ impl Work{
         // Add new tasks only if we don't exceed the number of tasks definied in \
         // the workload setting
         if self.should_add(){
-            self.add(channel);
+            self.get_tasks(channel);
         }
 
         // Get the blendfile from the server only if there are 
@@ -154,9 +195,8 @@ impl Work{
         // and whoose commands are not constructed yet
         self.construct_commands();
 
-
         // Update who the current Task is ("self.current")
-        self.update_next_task();
+        self.queue_next_task(channel);
 
         // Dispatch a Command for the current Task ("self.current")
         self.do_work();
@@ -167,7 +207,7 @@ impl Work{
     /// Store these in a Option-wrapped Work struct (along with...)
     /// Reject these messages if our system is not fit to do work
     /// Acknowledge messages that are wonky
-    pub fn add(&mut self, channel: &mut Channel){
+    pub fn get_tasks(&mut self, channel: &mut Channel){
         let mut remaining_delivery_tags = Vec::<u64>::new();
 
         // Get the next task from the work queue
@@ -226,34 +266,46 @@ impl Work{
 
     // Construct the commands
     pub fn construct_commands(&mut self){
-        self.tasks.iter_mut()
-                  .filter(|task| task.is_queued())
-                  .filter(|task| !task.command.is_constructed())
-                  .filter(|task| task.data.contains_key("blendfile"))
-                  .for_each(|task|{
-                      // we can unwrap this because, the key "blendfile" only exists
-                      // if there is a value
-                      let p = task.data.get("blendfile").unwrap().clone();
-                      task.construct(p, std::borrow::Cow::Borrowed("some/out/folder/####.png").to_string());
-                      println!(" ✚ [WORKER] Constructed task [{}]: {:?}", task.id, task.command.to_string());
-                  })
+        // copy the data of tasks
+        let mut data = std::mem::replace(&mut self.tasks, vec![]);
+        // mutate over it
+        data.iter_mut()
+            .filter(|task| task.is_queued())
+            .filter(|task| !task.command.is_constructed())
+            .filter(|task| task.data.contains_key("blendfile"))
+               .for_each(|task|{
+                // we can unwrap this because, the key "blendfile" only exists
+                   // if there is a value
+                let p = task.data.get("blendfile").unwrap().clone();
+                task.construct(p, self.config.outpath.clone().to_string_lossy().to_string());
+                println!(" ✚ [WORKER] Constructed task [{}]", task.id);
+            });
+        // put it pack
+        std::mem::replace(&mut self.tasks, data);
     }
 
     /// If there is a current Task, dispatch it. If a Task finished, finish it and
     /// push it back
     pub fn do_work(&mut self){
         // Do nothing if there is no current Task
-        match self.current{
-            Some(ref task) => {
-                let _c = task.command.to_string();
-                println!("Simulating Work...");
+        let finish = match self.current{
+            Some(ref mut task) => {
+                let c = task.command.to_string();
+                println!(" ✚ [WORKER] Simulating Work...");
+                println!(" ✚ [WORKER] {:?}", c);
+                // finish?
+                true
             },
-            None => ()
+            None => false
+        };
+
+        if finish{
+            self.finish_current();
         }
 
     }
 
-    /// Check if the ID for a Job is already stored in the blendfiles
+    /// Check if the ID for a Job is stored in the blendfiles
     pub fn holds_parent_id<S>(&self, id: S) -> bool where S: Into<String>{
         let id = id.into();
         self.blendfiles.keys().any(|key| key == &id)
@@ -272,35 +324,45 @@ impl Work{
         // Get a unique list from the tasks job ids, ignoring job IDs that are 
         // present as keys for the HashMap self.blendfiles already
         let ids: Vec<String> = self.unique_parent_ids()
-                                   .filter(|&id| !self.holds_parent_id(id))
+                                   .filter(|&id| !self.has_blendfile_by_id(id))
                                    .map(|id| id.to_owned())
                                    .collect();
 
         if ids.len() != 0{ 
-        println!("Debug: Found {} unique job IDs", ids.len());
-    }
 
-        // For each remaining ID start a request and insert the resulting path
-        // into the hashmap
-        ids.iter()
-            .for_each(|id|{
-                let p = self.request_blendfile(id.to_owned());
-                self.blendfiles.insert(id.to_string(), p);
-             });
-            
-        
+
+            // For each remaining ID start a request and insert the resulting path
+            // into the hashmap
+            ids.iter()
+                .for_each(|id|{
+                    let p = self.request_blendfile(id.to_owned());
+                    // println!("{:?}", p);
+                    let p =match p.as_path().exists(){
+                        true => Some(p),
+                        false => None
+                    };
+                    self.blendfiles.insert(id.to_string(), p);
+                    
+                 });
+
+            // println!("{:?}", self.blendfiles);
+        }
+
+        if ids.len() == self.blendfiles.iter().map(|(_,x)| x).filter(|e|e.is_some()).count(){
+            println!(" ✚ [WORKER] Downloaded all blendfiles");
+        }
     }
 
     /// Request a single blendfile for a given Job-ID from flaskbender via http
     /// get request. Uses the User-Agent http header to request the actual file
-    pub fn request_blendfile<S>(&mut self, id: S) -> Option<PathBuf> where S: Into<String>{
+    pub fn request_blendfile<S>(&mut self, id: S) -> PathBuf where S: Into<String>{
         let id = id.into();
         let url = self.config.bender_url.clone();
+        let url2 = self.config.bender_url.clone();
         let mut savepath = self.config.blendpath.clone();
         savepath.push(format!("{id}.blend", id=id));
 
         let savepath2 = savepath.clone();
-        let mut ok = false;
 
         // Run in own thread with future
         rt::run(rt::lazy(move || {
@@ -314,39 +376,38 @@ impl Work{
 
             // The actual request
             client.request(request)
-                  .and_then(|response| {
+                  .and_then(move |response| {
                         // The body is a stream, and for_each returns a new Future
                         // when the stream is finished, and calls the closure on
                         // each chunk of the body and writes the file to the 
+                        println!(" ✚ [WORKER] Downloading blendfile to {path}", path=savepath.to_string_lossy());
+                        // Create File
                         let mut file = File::create(&savepath).unwrap();
                         let status = response.status().clone();
+                        // Write all chunks
                         response.into_body().for_each(move |chunk| {
                             if status.is_success() {
-                                println!(" ✚ [WORKER] Requesting blendfile for job [{id}]", id=id);
-                                println!(" ✚ [WORKER] Saving blendfile to {path}", path=savepath.to_string_lossy());
                                 file.write_all(&chunk)
                                     .map_err(|e| panic!(" ✖ [WORKER] Error: Couldn't write Chunks to file: {}", e))
                             }else{
-                                println!(" ✖ [WORKER] Warning: The Server responded with: {}", status);
+                                println!(" ❗ [WORKER] Warning: The Server responded with: {}", status);
                                 std::io::sink().write_all(&chunk)
                                     .map_err(|e| panic!(" ✖ [WORKER] Error: Couldn't write Chunks to sink: {}", e))
                             }
                         })
                   })
                   .map(move |_| {
-                        println!(" ✚ [WORKER] Sucessfully saved blendfile for job");
-                        ok = true;
+                        println!(" ✚ [WORKER] Sucessfully saved blendfile for job [{}]", id);
                   })
-                    // If there was an error, let the user know...
-                  .map_err(|err| {
-                        eprintln!(" ✖ [WORKER] Error {}", err);
+                  .map_err(move |err| {
+                        if format!("{}", err).contains("(os error 111)") {
+                            eprintln!(" ✖ [WORKER] There is no server running at {}: {}", url2, err);
+                        }else{
+                            eprintln!(" ✖ [WORKER] Error {}", err);
+                        }
                   })
         }));
-
-        // If everything worked out, insert the id with the path to the file into the values
-        match ok { 
-            true => Some(savepath2),
-            false => None
-        }
+            // If everything worked out, insert the id with the path to the file into the values
+            savepath2
     }
 }
