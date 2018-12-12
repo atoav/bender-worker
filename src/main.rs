@@ -13,16 +13,14 @@ extern crate shlex;
 extern crate bender_job;
 extern crate bender_mq;
 
-use bender_mq::BenderMQ;
-use uuid::Uuid;
-// use bender_job::{Job, Task};
-use bender_mq::Channel;
-use app_dirs::*;
-use std::path::{PathBuf, Path};
-use serde_derive::{Serialize, Deserialize};
-use dialoguer::Confirmation;
 use std::fs;
 use std::process;
+use std::path::{PathBuf, Path};
+use app_dirs::*;
+use uuid::Uuid;
+use serde_derive::{Serialize, Deserialize};
+use dialoguer::Confirmation;
+use bender_mq::{Channel, BenderMQ};
 
 
 
