@@ -11,9 +11,7 @@ pub type GenError = Box<std::error::Error>;
 pub type GenResult<T> = Result<T, GenError>;
 
 
-// TODO: CHECK IF BLENDER BINARY IS IN PATH!
-
-
+/// Holds the bender-worker's Configuration
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct Config{
     pub bender_url: String,
@@ -28,6 +26,7 @@ pub struct Config{
 
 
 impl Config{
+    /// Create a new configuration with default values
     pub fn new() -> Self{
         // Default for now.
         let bender_url = "http://0.0.0.0:5000".to_string();
@@ -41,13 +40,15 @@ impl Config{
         }
     }
 
+    /// Serialize the Configuration to TOML
     pub fn serialize(&self) -> Result<String, Box<Error>>{
-        let s = serde_json::to_string_pretty(&self)?;
+        let s = toml::to_string_pretty(&self)?;
         Ok(s)
     }
 
+    /// Serialize the Configuration from TOML
     pub fn deserialize<S>(s: S) -> GenResult<Self> where S: Into<String> {
-        let deserialized: Config = serde_json::from_str(&s.into()[..])?;
+        let deserialized: Config = toml::from_str(&s.into()[..])?;
         Ok(deserialized)
     }
 
@@ -61,7 +62,7 @@ impl Config{
         Ok(())
     }
 
-    /// Create a new Config from the given json file
+    /// Create a new Config from the given toml file
     pub fn from_file<S>(p: S) -> GenResult<Self> where S: Into<PathBuf>{
         let p = p.into();
         let mut file = fs::File::open(&p)?;
@@ -75,7 +76,7 @@ impl Config{
 
 
 
-/// Run the setup dialog for the blendpath
+/// Run the interactive setup dialog for the blendpath
 pub fn setup_blendpath<P>(config: &mut Config, p: P) -> GenResult<()> where P: Into<PathBuf>{
     // Create the default path
     let mut p = p.into();
@@ -97,7 +98,7 @@ pub fn setup_blendpath<P>(config: &mut Config, p: P) -> GenResult<()> where P: I
 
 
 
-/// Run the setup dialog for the outpath
+/// Run the interactive setup dialog for the outpath, where the Frames should be saved
 pub fn setup_outpath<P>(config: &mut Config, p: P) -> GenResult<()> where P: Into<PathBuf>{
     // Create the default path
     let mut p = p.into();
@@ -124,7 +125,7 @@ pub fn setup_outpath<P>(config: &mut Config, p: P) -> GenResult<()> where P: Int
 pub fn get_config<P>(p: P) -> GenResult<Config> where P: Into<PathBuf>{
     let mut p = p.into();
     let d = p.clone();
-    p.push("config.json");
+    p.push("config.toml");
     match Path::new(&p).exists(){
         true => {
             println!("Reading the Configuration from:     {}", p.to_string_lossy());

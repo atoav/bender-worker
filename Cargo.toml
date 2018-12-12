@@ -12,7 +12,7 @@ itertools = "0.7"
 dialoguer = "0.3"
 serde = "1"
 serde_derive = "1"
-serde_json = "1"
+toml = "0.4"
 chrono = "0.4"
 hyper = "0.12"
 bender_job = { git = "ssh://git@code.hfbk.net:4242/bendercode/bender-job.git" }

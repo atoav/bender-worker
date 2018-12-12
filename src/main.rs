@@ -1,6 +1,5 @@
 extern crate app_dirs;
 extern crate serde;
-extern crate serde_json;
 extern crate fs2;
 extern crate serde_derive;
 extern crate uuid;
@@ -10,6 +9,7 @@ extern crate hyper;
 extern crate itertools;
 extern crate dialoguer;
 extern crate shlex;
+extern crate toml;
 extern crate bender_job;
 extern crate bender_mq;
 
@@ -57,7 +57,7 @@ fn main() {
                         let msg = "Do you want to generate a new one? (this overrides the existing configuration)";
                         if Confirmation::new().with_text(msg).interact().unwrap(){
                             let mut p = PathBuf::from(&app_savepath);
-                            p.push("config.json");
+                            p.push("config.toml");
                             fs::remove_file(&p).expect(format!("Error: Couldn't remove the file at {}\nPlease try to remove it manually", p.to_string_lossy()).as_str());
                             println!("Deleted the configuration file. Run worker again for a fresh new start");
                         }
