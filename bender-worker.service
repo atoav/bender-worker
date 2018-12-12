@@ -1,0 +1,9 @@
+[Unit]
+Description=bender-worker
+
+[Service]
+Type=simple
+ExecStart=/usr/local/bin/bender-worker
+
+[Install]
+WantedBy=multi-user.target
