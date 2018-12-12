@@ -9,6 +9,7 @@ extern crate chrono;
 extern crate hyper;
 extern crate itertools;
 extern crate dialoguer;
+extern crate shlex;
 extern crate bender_job;
 extern crate bender_mq;
 

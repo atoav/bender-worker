@@ -1,4 +1,7 @@
 use ::*;
+use std::thread::sleep;
+use std::time::Duration;
+use std::process::Command;
 use config::Config;
 use amqp::Basic;
 use bender_job::Task;
@@ -11,18 +14,21 @@ use std::fs::File;
 use hyper::{Client, Body};
 use hyper::http::Request;
 use hyper::rt::{self, Future, Stream};
+use std::process::{Stdio};
+use std::io::{BufRead, BufReader};
 // use config::GenResult;
 
 
 
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub struct Work{
     pub config: Config,
     pub tasks: Vec<Task>,
     pub current: Option<Task>,
     pub history: History,
     pub frames: Vec<PathBuf>,
-    pub blendfiles: HashMap<String, Option<PathBuf>>
+    pub blendfiles: HashMap<String, Option<PathBuf>>,
+    command: Option<std::process::Child>
 }
 
 
@@ -36,7 +42,8 @@ impl Work{
             current: None,
             history: History::new(),
             frames: Vec::<PathBuf>::new(),
-            blendfiles: HashMap::<String, Option<PathBuf>>::new()
+            blendfiles: HashMap::<String, Option<PathBuf>>::new(),
+            command: None
         }
     }
 
@@ -120,7 +127,7 @@ impl Work{
     /// Sets the Tasks Status to Running
     pub fn queue_next_task(&mut self, channel: &mut Channel){
         // Only do this if there is no task running
-        if !self.tasks.iter().any(|t| t.is_running()) {
+        if !self.tasks.iter().any(|t| t.is_running()) && self.current.is_none() {
             let mut i = 0;
             let mut next = None;
             // Find the first task that:
@@ -155,24 +162,53 @@ impl Work{
                 None => ()
             }
         }else{
-            println!(" ✚ [WORKER] didn't get a new task because the old is running");
+            // println!(" ✚ [WORKER] didn't get a new task because the old is running"); Debug
         }
     }
 
     /// finish the current task and push it back to tasks
-    pub fn finish_current(&mut self){
+    pub fn finish_current(&mut self, channel: &mut Channel){
         let mut moved = false;
         // let c =  self.clone();
         if let Some(ref mut t) = self.current{
             t.finish();
-            println!(" ✚ [WORKER] Finished Task");
             self.tasks.push(t.clone());
             moved = true;
-            // println!("\n{:#?}", c);
+            println!(" ✔️ [WORKER] Finished task [{}] for job [{}]", t.id, t.parent_id);
+            let routing_key = format!("worker.{}", self.config.id);
+            match channel.post_task_info(&t, routing_key){
+                Ok(_) => (),
+                Err(err) => eprintln!(" ✖ [WORKER] Error: Couldn't post current task to info queue: {}", err)
+            }
         }
 
         if moved{
             self.current = None;
+            self.command = None;
+        }
+    }
+
+    /// error the current task and push it back to tasks
+    pub fn error_current<S>(&mut self, err: S, channel: &mut Channel) where S: Into<String>{
+        let err = err.into();
+        let mut moved = false;
+        // let c =  self.clone();
+        if let Some(ref mut t) = self.current{
+            t.error();
+            println!(" ✚ [WORKER] Task Errored: {}", err);
+            self.tasks.push(t.clone());
+            moved = true;
+            println!(" ✖ [WORKER] Errored task [{}] for job [{}]: {}", t.id, t.parent_id, err);
+            let routing_key = format!("worker.{}", self.config.id);
+            match channel.post_task_info(&t, routing_key){
+                Ok(_) => (),
+                Err(err) => eprintln!(" ✖ [WORKER] Error: Couldn't post current task to info queue: {}", err)
+            }
+        }
+
+        if moved{
+            self.current = None;
+            self.command = None;
         }
     }
 
@@ -199,9 +235,11 @@ impl Work{
         self.queue_next_task(channel);
 
         // Dispatch a Command for the current Task ("self.current")
-        self.do_work();
+        self.run_command(channel);
 
     }
+
+
 
     /// Listen in to work queue and get n messages (defined by the workload setting)
     /// Store these in a Option-wrapped Work struct (along with...)
@@ -245,6 +283,8 @@ impl Work{
         }
     }
 
+
+
     /// Add the blendfiles paths to data
     pub fn add_paths_to_tasks(&mut self){
         let blendfiles = self.blendfiles.clone();
@@ -261,8 +301,9 @@ impl Work{
                           None => ()
                       }
                   })
-
     }
+
+
 
     // Construct the commands
     pub fn construct_commands(&mut self){
@@ -277,33 +318,94 @@ impl Work{
                 // we can unwrap this because, the key "blendfile" only exists
                    // if there is a value
                 let p = task.data.get("blendfile").unwrap().clone();
-                task.construct(p, self.config.outpath.clone().to_string_lossy().to_string());
-                println!(" ✚ [WORKER] Constructed task [{}]", task.id);
+                let mut out = self.config.outpath.clone();
+                out.push(task.parent_id.as_str());
+                if !out.exists(){
+                    match fs::create_dir(&out){
+                        Ok(_) => (),
+                        Err(err) => eprintln!(" ✖ [WORKER] Error: Couldn't create Directory {}", err)
+                    }  
+                }
+                if out.exists(){
+                    let outstr = out.clone().to_string_lossy().to_string();
+                    task.construct(p, outstr);
+                    match task.command{
+                        bender_job::Command::Blender(ref c) => println!(" ✚ [WORKER] Constructed task for frame [{}]", c.frame),
+                        _ => println!(" ✚ [WORKER] Constructed generic task [{}]", task.id)
+                    }
+                }
             });
         // put it pack
         std::mem::replace(&mut self.tasks, data);
     }
 
-    /// If there is a current Task, dispatch it. If a Task finished, finish it and
-    /// push it back
-    pub fn do_work(&mut self){
-        // Do nothing if there is no current Task
-        let finish = match self.current{
-            Some(ref mut task) => {
-                let c = task.command.to_string();
-                println!(" ✚ [WORKER] Simulating Work...");
-                println!(" ✚ [WORKER] {:?}", c);
-                // finish?
-                true
+
+    pub fn run_command(&mut self, channel: &mut Channel){
+        let exitstatus = match self{
+            // When there is no command but a current task, create a command and spawn it
+            Work{command: None, current: Some(task), ..} => {
+                // If there is no command create one
+                if task.command.is_blender(){
+                    // Replace only first "blender " in command string
+                    let s = task.command.to_string().unwrap().replacen("blender ", "", 1);
+                    match shlex::split(&s){
+                        Some(args) => {
+                            match Command::new("blender")
+                                                   .args(args.clone())
+                                                   .stdout(Stdio::piped())
+                                                   .stderr(Stdio::piped())
+                                                   .spawn(){
+                                Ok(c) => {
+                                    println!(" ◯ [WORKER] Dispatched Command: \"blender {}\"", args.join(" "));
+                                    self.command = Some(c);
+                                    ExitStatus::Running
+                                },
+                                Err(err) => ExitStatus::Errored(
+                                    format!(" ✖ [WORKER] Error: Couldn't spawn Command with args: {:?}. Error was: {}", args, err))
+                            }
+                        },
+                        None => ExitStatus::Errored(format!(" ✖ [WORKER] Error: Couldn't split arguments for command: {:?}", task.command))
+                    }
+                }else{
+                    ExitStatus::None
+                }
             },
-            None => false
+            // when there is a command and a current task wait for the command to finish
+            Work{command: Some(ref mut child), current:Some(_task), ..} => {
+                let timeout = Duration::from_secs(1);
+                sleep(timeout);
+                match child.try_wait() {
+                    Ok(Some(status)) if status.success() => {
+                        ExitStatus::Finished
+                    },
+                    Ok(Some(status))  => ExitStatus::Errored(format!(" ✖ [WORKER] Error: Command returned with status: {:?}", status)),
+                    Ok(None) => {
+                        process_stdout(child);
+                        ExitStatus::Running
+                    },
+                    Err(err) => 
+                        ExitStatus::Errored(format!(" ✖ [WORKER] Error: waiting for spawned Command: {}", err)),
+                }
+            },
+            // Everything else
+            _ => ExitStatus::None
         };
 
-        if finish{
-            self.finish_current();
+        match exitstatus{
+            ExitStatus::None => (),
+            ExitStatus::Running => {
+                match self.current{
+                    Some(ref mut c) if !c.is_running() => c.start(),
+                    _ => ()
+                }
+            },
+            ExitStatus::Errored(err) => self.error_current(err, channel),
+            ExitStatus::Finished => self.finish_current(channel)
         }
-
     }
+
+
+        
 
     /// Check if the ID for a Job is stored in the blendfiles
     pub fn holds_parent_id<S>(&self, id: S) -> bool where S: Into<String>{
@@ -329,7 +431,6 @@ impl Work{
                                    .collect();
 
         if ids.len() != 0{ 
-
 
             // For each remaining ID start a request and insert the resulting path
             // into the hashmap
@@ -409,5 +510,30 @@ impl Work{
         }));
             // If everything worked out, insert the id with the path to the file into the values
             savepath2
+    }
+}
+
+
+pub enum ExitStatus{
+    Finished,
+    Errored(String),
+    Running,
+    None
+}
+
+
+
+pub fn process_stdout(child:&mut std::process::Child){
+    match child.stdout{
+        Some(ref mut stdout) => {
+            let reader = BufReader::new(stdout);
+            reader.lines()
+                  .filter_map(|line| line.ok())
+                  .filter(|line| line.trim() != "")
+                  .for_each(|_line| {
+                    // println!("   [WORKER] {}", line);
+                  });
+        },
+        None => eprintln!(" ✖ [WORKER] Error: Couldn't get stdout")
     }
 }

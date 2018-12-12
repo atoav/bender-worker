@@ -7,6 +7,7 @@ authors = ["David Huss <dh@widerstandzwecklos.at>"]
 app_dirs = "1.2"
 uuid = { version = "0.7", features = ["serde", "v4"] }
 fs2 = "0.4"
+shlex = "0.1"
 itertools = "0.7"
 dialoguer = "0.3"
 serde = "1"

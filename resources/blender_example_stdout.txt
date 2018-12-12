@@ -1,0 +1,102 @@
+CUDA cuInit: Unknown error
+Fra:23 Mem:12.44M (0.00M, Peak 14.11M) | Time:00:00.15 | Mem:0.00M, Peak:0.00M | Scene, RenderLayer | Synchronizing object | Lamp.001
+Fra:23 Mem:12.44M (0.00M, Peak 14.11M) | Time:00:00.15 | Mem:0.00M, Peak:0.00M | Scene, RenderLayer | Synchronizing object | Cube
+Fra:23 Mem:14.84M (0.00M, Peak 21.06M) | Time:00:00.28 | Mem:0.00M, Peak:0.00M | Scene, RenderLayer | Synchronizing object | Camera
+Fra:23 Mem:14.84M (0.00M, Peak 21.06M) | Time:00:00.28 | Mem:0.00M, Peak:0.00M | Scene, RenderLayer | Synchronizing object | Lamp
+Fra:23 Mem:14.84M (0.00M, Peak 21.06M) | Time:00:00.28 | Mem:0.00M, Peak:0.00M | Scene, RenderLayer | Initializing
+Fra:23 Mem:14.84M (0.00M, Peak 21.06M) | Time:00:00.33 | Mem:0.00M, Peak:0.00M | Scene, RenderLayer | Synchronizing object | Lamp.001
+Fra:23 Mem:14.84M (0.00M, Peak 21.06M) | Time:00:00.33 | Mem:0.00M, Peak:0.00M | Scene, RenderLayer | Synchronizing object | Cube
+Fra:23 Mem:16.34M (0.00M, Peak 21.06M) | Time:00:00.37 | Mem:0.00M, Peak:0.00M | Scene, RenderLayer | Synchronizing object | Camera
+Fra:23 Mem:16.34M (0.00M, Peak 21.06M) | Time:00:00.37 | Mem:0.00M, Peak:0.00M | Scene, RenderLayer | Synchronizing object | Lamp
+Fra:23 Mem:16.34M (0.00M, Peak 21.06M) | Time:00:00.37 | Mem:0.00M, Peak:0.00M | Scene, RenderLayer | Initializing
+Fra:23 Mem:16.34M (0.00M, Peak 21.06M) | Time:00:00.42 | Mem:0.00M, Peak:0.00M | Scene, RenderLayer | Synchronizing object | Lamp.001
+Fra:23 Mem:16.34M (0.00M, Peak 21.06M) | Time:00:00.42 | Mem:0.00M, Peak:0.00M | Scene, RenderLayer | Synchronizing object | Cube
+Fra:23 Mem:16.34M (0.00M, Peak 22.52M) | Time:00:00.45 | Mem:0.00M, Peak:0.00M | Scene, RenderLayer | Synchronizing object | Camera
+Fra:23 Mem:16.34M (0.00M, Peak 22.52M) | Time:00:00.45 | Mem:0.00M, Peak:0.00M | Scene, RenderLayer | Synchronizing object | Lamp
+Fra:23 Mem:16.34M (0.00M, Peak 22.52M) | Time:00:00.45 | Mem:0.00M, Peak:0.00M | Scene, RenderLayer | Initializing
+Fra:23 Mem:16.35M (0.00M, Peak 22.52M) | Time:00:00.50 | Mem:0.00M, Peak:0.00M | Scene, RenderLayer | Loading render kernels (may take a few minutes the first time)
+Fra:23 Mem:16.35M (0.00M, Peak 22.52M) | Time:00:00.50 | Mem:0.00M, Peak:0.00M | Scene, RenderLayer | Waiting for render to start
+Fra:23 Mem:16.35M (0.00M, Peak 22.52M) | Time:00:00.50 | Mem:0.00M, Peak:0.00M | Scene, RenderLayer | Updating Scene
+Fra:23 Mem:16.35M (0.00M, Peak 22.52M) | Time:00:00.50 | Mem:0.00M, Peak:0.00M | Scene, RenderLayer | Updating Shaders
+Fra:23 Mem:16.85M (0.00M, Peak 22.52M) | Time:00:00.68 | Mem:0.00M, Peak:0.00M | Scene, RenderLayer | Updating Background
+Fra:23 Mem:16.85M (0.00M, Peak 22.52M) | Time:00:00.68 | Mem:0.00M, Peak:0.00M | Scene, RenderLayer | Updating Camera
+Fra:23 Mem:16.85M (0.00M, Peak 22.52M) | Time:00:00.68 | Mem:0.00M, Peak:0.00M | Scene, RenderLayer | Updating Meshes Flags
+Fra:23 Mem:16.85M (0.00M, Peak 22.52M) | Time:00:00.68 | Mem:0.00M, Peak:0.00M | Scene, RenderLayer | Updating Objects
+Fra:23 Mem:16.85M (0.00M, Peak 22.52M) | Time:00:00.68 | Mem:0.00M, Peak:0.00M | Scene, RenderLayer | Updating Objects | Copying Transformations to device
+Fra:23 Mem:16.85M (0.00M, Peak 22.52M) | Time:00:00.68 | Mem:0.00M, Peak:0.00M | Scene, RenderLayer | Updating Objects | Applying Static Transformations
+Fra:23 Mem:16.85M (0.00M, Peak 22.52M) | Time:00:00.68 | Mem:0.00M, Peak:0.00M | Scene, RenderLayer | Updating Meshes
+Fra:23 Mem:17.60M (0.00M, Peak 22.52M) | Time:00:00.68 | Mem:0.00M, Peak:0.00M | Scene, RenderLayer | Updating Mesh | Computing attributes
+Fra:23 Mem:19.48M (0.00M, Peak 22.52M) | Time:00:00.68 | Mem:0.00M, Peak:0.00M | Scene, RenderLayer | Updating Mesh | Copying Attributes to device
+Fra:23 Mem:19.48M (0.00M, Peak 22.52M) | Time:00:00.68 | Mem:1.88M, Peak:1.88M | Scene, RenderLayer | Updating Mesh BVH Cube 1/1 | Building BVH
+Fra:23 Mem:22.29M (0.00M, Peak 22.52M) | Time:00:00.72 | Mem:1.88M, Peak:1.88M | Scene, RenderLayer | Updating Mesh BVH Cube 1/1 | Packing BVH triangles and strands
+Fra:23 Mem:24.91M (0.00M, Peak 24.91M) | Time:00:00.72 | Mem:1.88M, Peak:1.88M | Scene, RenderLayer | Updating Mesh BVH Cube 1/1 | Packing BVH nodes
+Fra:23 Mem:23.34M (0.00M, Peak 25.59M) | Time:00:00.73 | Mem:1.88M, Peak:1.88M | Scene, RenderLayer | Updating Scene BVH | Building
+Fra:23 Mem:23.34M (0.00M, Peak 25.59M) | Time:00:00.73 | Mem:1.88M, Peak:1.88M | Scene, RenderLayer | Updating Scene BVH | Building BVH
+Fra:23 Mem:23.34M (0.00M, Peak 25.59M) | Time:00:00.73 | Mem:1.88M, Peak:1.88M | Scene, RenderLayer | Updating Scene BVH | Packing BVH triangles and strands
+Fra:23 Mem:23.34M (0.00M, Peak 25.59M) | Time:00:00.73 | Mem:1.88M, Peak:1.88M | Scene, RenderLayer | Updating Scene BVH | Packing BVH nodes
+Fra:23 Mem:27.20M (0.00M, Peak 27.20M) | Time:00:00.74 | Mem:1.88M, Peak:1.88M | Scene, RenderLayer | Updating Scene BVH | Copying BVH to device
+Fra:23 Mem:27.39M (0.00M, Peak 27.39M) | Time:00:00.74 | Mem:5.74M, Peak:5.74M | Scene, RenderLayer | Updating Mesh | Computing normals
+Fra:23 Mem:29.07M (0.00M, Peak 29.07M) | Time:00:00.74 | Mem:5.74M, Peak:5.74M | Scene, RenderLayer | Updating Mesh | Copying Mesh to device
+Fra:23 Mem:28.89M (0.00M, Peak 29.07M) | Time:00:00.74 | Mem:7.43M, Peak:7.43M | Scene, RenderLayer | Updating Objects Flags
+Fra:23 Mem:28.89M (0.00M, Peak 29.07M) | Time:00:00.74 | Mem:7.43M, Peak:7.43M | Scene, RenderLayer | Updating Images
+Fra:23 Mem:28.89M (0.00M, Peak 29.07M) | Time:00:00.74 | Mem:7.43M, Peak:7.43M | Scene, RenderLayer | Updating Camera Volume
+Fra:23 Mem:28.89M (0.00M, Peak 29.07M) | Time:00:00.74 | Mem:7.43M, Peak:7.43M | Scene, RenderLayer | Updating Hair Systems
+Fra:23 Mem:28.89M (0.00M, Peak 29.07M) | Time:00:00.74 | Mem:7.43M, Peak:7.43M | Scene, RenderLayer | Updating Hair settings | Copying Hair settings to device
+Fra:23 Mem:28.89M (0.00M, Peak 29.07M) | Time:00:00.74 | Mem:7.43M, Peak:7.43M | Scene, RenderLayer | Updating Lookup Tables
+Fra:23 Mem:28.89M (0.00M, Peak 29.07M) | Time:00:00.74 | Mem:7.68M, Peak:7.68M | Scene, RenderLayer | Updating Lights
+Fra:23 Mem:28.89M (0.00M, Peak 29.07M) | Time:00:00.74 | Mem:7.68M, Peak:7.68M | Scene, RenderLayer | Updating Lights | Computing distribution
+Fra:23 Mem:28.89M (0.00M, Peak 29.07M) | Time:00:00.74 | Mem:7.68M, Peak:7.68M | Scene, RenderLayer | Updating Particle Systems
+Fra:23 Mem:28.89M (0.00M, Peak 29.07M) | Time:00:00.74 | Mem:7.68M, Peak:7.68M | Scene, RenderLayer | Updating Particle Systems | Copying Particles to device
+Fra:23 Mem:28.89M (0.00M, Peak 29.07M) | Time:00:00.74 | Mem:7.68M, Peak:7.68M | Scene, RenderLayer | Updating Integrator
+Fra:23 Mem:28.93M (0.00M, Peak 29.07M) | Time:00:00.74 | Mem:7.72M, Peak:7.72M | Scene, RenderLayer | Updating Film
+Fra:23 Mem:28.93M (0.00M, Peak 29.19M) | Time:00:00.74 | Mem:7.72M, Peak:7.72M | Scene, RenderLayer | Updating Lookup Tables
+Fra:23 Mem:28.93M (0.00M, Peak 29.19M) | Time:00:00.74 | Mem:7.72M, Peak:7.72M | Scene, RenderLayer | Updating Baking
+Fra:23 Mem:28.93M (0.00M, Peak 29.19M) | Time:00:00.74 | Mem:7.72M, Peak:7.72M | Scene, RenderLayer | Updating Device | Writing constant memory
+Fra:23 Mem:28.93M (0.00M, Peak 29.19M) | Time:00:00.74 | Mem:7.72M, Peak:7.72M | Scene, RenderLayer | Path Tracing Tile 0/40
+Fra:23 Mem:29.35M (0.00M, Peak 29.64M) | Time:00:00.74 | Remaining:00:00.06 | Mem:8.15M, Peak:8.29M | Scene, RenderLayer | Path Tracing Tile 1/40
+Fra:23 Mem:29.35M (0.00M, Peak 29.64M) | Time:00:00.74 | Remaining:00:00.07 | Mem:8.15M, Peak:8.29M | Scene, RenderLayer | Path Tracing Tile 2/40
+Fra:23 Mem:29.35M (0.00M, Peak 29.64M) | Time:00:00.75 | Remaining:00:00.12 | Mem:8.15M, Peak:8.29M | Scene, RenderLayer | Path Tracing Tile 3/40
+Fra:23 Mem:29.35M (0.00M, Peak 29.64M) | Time:00:00.76 | Remaining:00:00.14 | Mem:8.15M, Peak:8.29M | Scene, RenderLayer | Path Tracing Tile 4/40
+Fra:23 Mem:29.35M (0.00M, Peak 29.64M) | Time:00:00.76 | Remaining:00:00.14 | Mem:8.15M, Peak:8.29M | Scene, RenderLayer | Path Tracing Tile 5/40
+Fra:23 Mem:29.35M (0.00M, Peak 29.64M) | Time:00:00.77 | Remaining:00:00.12 | Mem:8.15M, Peak:8.29M | Scene, RenderLayer | Path Tracing Tile 6/40
+Fra:23 Mem:29.35M (0.00M, Peak 29.64M) | Time:00:00.78 | Remaining:00:00.13 | Mem:8.15M, Peak:8.29M | Scene, RenderLayer | Path Tracing Tile 7/40
+Fra:23 Mem:29.35M (0.00M, Peak 29.64M) | Time:00:00.78 | Remaining:00:00.13 | Mem:8.15M, Peak:8.29M | Scene, RenderLayer | Path Tracing Tile 8/40
+Fra:23 Mem:29.35M (0.00M, Peak 29.64M) | Time:00:00.85 | Remaining:00:00.26 | Mem:8.15M, Peak:8.29M | Scene, RenderLayer | Path Tracing Tile 9/40
+Fra:23 Mem:29.35M (0.00M, Peak 29.64M) | Time:00:00.88 | Remaining:00:00.28 | Mem:8.15M, Peak:8.29M | Scene, RenderLayer | Path Tracing Tile 10/40
+Fra:23 Mem:29.35M (0.00M, Peak 29.64M) | Time:00:00.91 | Remaining:00:00.28 | Mem:8.15M, Peak:8.29M | Scene, RenderLayer | Path Tracing Tile 11/40
+Fra:23 Mem:29.35M (0.00M, Peak 29.64M) | Time:00:00.92 | Remaining:00:00.25 | Mem:8.15M, Peak:8.29M | Scene, RenderLayer | Path Tracing Tile 12/40
+Fra:23 Mem:29.28M (0.00M, Peak 29.64M) | Time:00:00.92 | Remaining:00:00.23 | Mem:8.08M, Peak:8.29M | Scene, RenderLayer | Path Tracing Tile 13/40
+Fra:23 Mem:29.35M (0.00M, Peak 29.64M) | Time:00:00.93 | Remaining:00:00.23 | Mem:8.15M, Peak:8.29M | Scene, RenderLayer | Path Tracing Tile 14/40
+Fra:23 Mem:29.35M (0.00M, Peak 29.64M) | Time:00:00.94 | Remaining:00:00.21 | Mem:8.15M, Peak:8.29M | Scene, RenderLayer | Path Tracing Tile 15/40
+Fra:23 Mem:29.35M (0.00M, Peak 29.64M) | Time:00:00.95 | Remaining:00:00.20 | Mem:8.15M, Peak:8.29M | Scene, RenderLayer | Path Tracing Tile 16/40
+Fra:23 Mem:29.35M (0.00M, Peak 29.64M) | Time:00:00.97 | Remaining:00:00.22 | Mem:8.15M, Peak:8.29M | Scene, RenderLayer | Path Tracing Tile 17/40
+Fra:23 Mem:29.35M (0.00M, Peak 29.64M) | Time:00:01.17 | Remaining:00:00.28 | Mem:8.15M, Peak:8.29M | Scene, RenderLayer | Path Tracing Tile 18/40
+Fra:23 Mem:29.35M (0.00M, Peak 29.64M) | Time:00:01.19 | Remaining:00:00.27 | Mem:8.15M, Peak:8.29M | Scene, RenderLayer | Path Tracing Tile 19/40
+Fra:23 Mem:29.35M (0.00M, Peak 29.64M) | Time:00:01.20 | Remaining:00:00.23 | Mem:8.15M, Peak:8.29M | Scene, RenderLayer | Path Tracing Tile 20/40
+Fra:23 Mem:29.27M (0.00M, Peak 29.64M) | Time:00:01.22 | Remaining:00:00.22 | Mem:8.08M, Peak:8.29M | Scene, RenderLayer | Path Tracing Tile 21/40
+Fra:23 Mem:29.35M (0.00M, Peak 29.64M) | Time:00:01.23 | Remaining:00:00.18 | Mem:8.15M, Peak:8.29M | Scene, RenderLayer | Path Tracing Tile 22/40
+Fra:23 Mem:29.34M (0.00M, Peak 29.64M) | Time:00:01.23 | Remaining:00:00.18 | Mem:8.14M, Peak:8.29M | Scene, RenderLayer | Path Tracing Tile 23/40
+Fra:23 Mem:29.35M (0.00M, Peak 29.64M) | Time:00:01.23 | Remaining:00:00.16 | Mem:8.15M, Peak:8.29M | Scene, RenderLayer | Path Tracing Tile 24/40
+Fra:23 Mem:29.35M (0.00M, Peak 29.64M) | Time:00:01.24 | Remaining:00:00.15 | Mem:8.15M, Peak:8.29M | Scene, RenderLayer | Path Tracing Tile 25/40
+Fra:23 Mem:29.35M (0.00M, Peak 29.64M) | Time:00:01.31 | Remaining:00:00.13 | Mem:8.15M, Peak:8.29M | Scene, RenderLayer | Path Tracing Tile 26/40
+Fra:23 Mem:29.35M (0.00M, Peak 29.64M) | Time:00:01.37 | Remaining:00:00.10 | Mem:8.15M, Peak:8.29M | Scene, RenderLayer | Path Tracing Tile 27/40
+Fra:23 Mem:29.35M (0.00M, Peak 29.64M) | Time:00:01.39 | Remaining:00:00.07 | Mem:8.15M, Peak:8.29M | Scene, RenderLayer | Path Tracing Tile 28/40
+Fra:23 Mem:29.28M (0.00M, Peak 29.64M) | Time:00:01.39 | Remaining:00:00.05 | Mem:8.08M, Peak:8.29M | Scene, RenderLayer | Path Tracing Tile 29/40
+Fra:23 Mem:29.28M (0.00M, Peak 29.64M) | Time:00:01.39 | Remaining:00:00.04 | Mem:8.08M, Peak:8.29M | Scene, RenderLayer | Path Tracing Tile 30/40
+Fra:23 Mem:29.28M (0.00M, Peak 29.64M) | Time:00:01.39 | Remaining:00:00.04 | Mem:8.08M, Peak:8.29M | Scene, RenderLayer | Path Tracing Tile 31/40
+Fra:23 Mem:29.28M (0.00M, Peak 29.64M) | Time:00:01.39 | Remaining:00:00.03 | Mem:8.08M, Peak:8.29M | Scene, RenderLayer | Path Tracing Tile 32/40
+Fra:23 Mem:29.28M (0.00M, Peak 29.64M) | Time:00:01.39 | Remaining:00:00.03 | Mem:8.08M, Peak:8.29M | Scene, RenderLayer | Path Tracing Tile 33/40
+Fra:23 Mem:29.24M (0.00M, Peak 29.64M) | Time:00:01.39 | Remaining:00:00.03 | Mem:8.04M, Peak:8.29M | Scene, RenderLayer | Path Tracing Tile 34/40
+Fra:23 Mem:29.24M (0.00M, Peak 29.64M) | Time:00:01.39 | Remaining:00:00.02 | Mem:8.04M, Peak:8.29M | Scene, RenderLayer | Path Tracing Tile 35/40
+Fra:23 Mem:29.24M (0.00M, Peak 29.64M) | Time:00:01.39 | Remaining:00:00.02 | Mem:8.04M, Peak:8.29M | Scene, RenderLayer | Path Tracing Tile 36/40
+Fra:23 Mem:29.24M (0.00M, Peak 29.64M) | Time:00:01.39 | Remaining:00:00.02 | Mem:8.04M, Peak:8.29M | Scene, RenderLayer | Path Tracing Tile 37/40
+Fra:23 Mem:29.21M (0.00M, Peak 29.64M) | Time:00:01.40 | Remaining:00:00.01 | Mem:8.01M, Peak:8.29M | Scene, RenderLayer | Path Tracing Tile 38/40
+Fra:23 Mem:29.07M (0.00M, Peak 29.64M) | Time:00:01.40 | Remaining:00:00.01 | Mem:7.87M, Peak:8.29M | Scene, RenderLayer | Path Tracing Tile 39/40, Sample 4/4
+Fra:23 Mem:28.93M (0.00M, Peak 29.64M) | Time:00:01.42 | Mem:7.72M, Peak:8.29M | Scene, RenderLayer | Path Tracing Tile 40/40
+Fra:23 Mem:28.93M (0.00M, Peak 29.64M) | Time:00:01.42 | Mem:7.72M, Peak:8.29M | Scene, RenderLayer | Finished
+Fra:23 Mem:12.69M (0.00M, Peak 29.64M) | Time:00:01.42 | Sce: Scene Ve:0 Fa:0 La:0
+Saved: '/home/atoav/.config/Bender-Worker/frames/25framesshortshortshortshortshor/000023.png'
+ Time: 00:01.52 (Saving: 00:00.09)
+
+
+Blender quit
