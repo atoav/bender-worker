@@ -144,7 +144,7 @@ dependencies = [
 [[package]]
 name = "bender_job"
 version = "0.1.0"
-source = "git+ssh://git@code.hfbk.net:4242/bendercode/bender-job.git#5ac0553e863321b36c5592c76ba8beed339514fc"
+source = "git+ssh://git@code.hfbk.net:4242/bendercode/bender-job.git#5c05259ab26132171928cf144e5df61fc8061b2f"
 dependencies = [
  "bender_bouncer 0.1.0 (git+ssh://git@code.hfbk.net:4242/bendercode/bender-bouncer.git)",
  "bender_config 0.1.0 (git+ssh://git@code.hfbk.net:4242/bendercode/bender-config.git)",
