@@ -4,17 +4,17 @@ use ::*;
 
 pub fn blender_in_path() -> bool{
     match process::Command::new("blender").arg("--version").status() {
-    Ok(_) => true,
-    Err(e) => {
-        if let std::io::ErrorKind::NotFound = e.kind() {
-            eprintln!(" ✖ [WORKER] Blender is not installed or not in PATH environment variable: {}", e);
-            false
-        } else {
-            eprintln!(" ✖ [WORKER] Blender --version returned Error: {}", e);
-            false
-        }
-    }, 
-}
+        Ok(_) => true,
+        Err(e) => {
+            if let std::io::ErrorKind::NotFound = e.kind() {
+                eprintln!(" ✖ [WORKER] Blender is not installed or not in PATH environment variable: {}", e);
+                false
+            } else {
+                eprintln!(" ✖ [WORKER] Blender --version returned Error: {}", e);
+                false
+            }
+        }, 
+    }
 }
 
 
