@@ -57,11 +57,21 @@ impl Work{
         self.blendfiles.insert(id.into(), Some(path.into()));
     }
 
-    /// Returns true if a new task should be added
+    /// Returns true if a new task should be added. This depends on two factors:
+    /// 1. the workload that self has set in the config
+    /// 2. whether there is enough space left
     pub fn should_add(&self) -> bool{
+        let okay_space = system::enough_space(&self.config.outpath, self.config.disklimit);
+        if okay_space{
+            println!(" ❗ [WORKER] Warning: Taking no new jobs");
+            system::print_space_warning(&self.config.outpath, self.config.disklimit);
+        }
         self.tasks.iter()
-                  .filter(|t| t.is_waiting())
+                  .filter(|t| t.is_waiting() || t.is_queued())
                   .count() < self.config.workload
+                      &&
+                  okay_space
+                  
     }
 
     /// Returns true if there is at least one task
@@ -140,9 +150,9 @@ impl Work{
                    self.tasks[i].command.is_constructed() &&
                    self.tasks[i].is_queued() &&
                    next.is_none() {
-                    next = Some(self.tasks.remove(i));
+                       next = Some(self.tasks.remove(i));
                 } else {
-                    i += 1;
+                       i += 1;
                 }
             }
 
@@ -159,10 +169,10 @@ impl Work{
                     }
                     self.current = Some(t);
                 },
-                None => ()
+                None => () //println!("Debug: Queued none, there was no next...")
             }
         }else{
-            // println!(" ✚ [WORKER] didn't get a new task because the old is running"); Debug
+             //println!("Debug: didn't get a new task because the old is running");
         }
     }
 
@@ -173,13 +183,28 @@ impl Work{
         if let Some(ref mut t) = self.current{
             t.finish();
             self.tasks.push(t.clone());
+
+            // Ack the finished Task!
+            // let deliver_tag = t.data.get("task-delivery-tag")
+            //                         .clone()
+            //                         .unwrap()
+            //                         .parse::<u64>()
+            //                         .unwrap();
+            // if let Err(err) = channel.basic_ack(deliver_tag, false){
+            //     eprintln!(" ✖ [WORKER] Error: Couldn't acknowledge task {} for job [{}]: {}", 
+            //         t.command.short(), 
+            //         t.parent_id,
+            //         err);
+            // }
+
+            // Post the updated Task Info
+            let routing_key = format!("worker.{}", self.config.id);
+            if let Err(err) = channel.post_task_info(&t, routing_key){
+                eprintln!(" ✖ [WORKER] Error: Couldn't post current task to info queue: {}", err)
+            }
+
             moved = true;
             println!(" ✔️ [WORKER] Finished task [{}] for job [{}]", t.id, t.parent_id);
-            let routing_key = format!("worker.{}", self.config.id);
-            match channel.post_task_info(&t, routing_key){
-                Ok(_) => (),
-                Err(err) => eprintln!(" ✖ [WORKER] Error: Couldn't post current task to info queue: {}", err)
-            }
         }
 
         if moved{
@@ -391,11 +416,16 @@ impl Work{
             _ => ExitStatus::None
         };
 
+        // println!("Debug: We have a exitstatus of: {:?}", exitstatus);
+
         match exitstatus{
             ExitStatus::None => (),
             ExitStatus::Running => {
                 match self.current{
-                    Some(ref mut c) if !c.is_running() => c.start(),
+                    Some(ref mut c) if !c.is_running() => {
+                        c.start();
+                        // println!("Debug: Started Task because it wasn't running");
+                    },
                     _ => ()
                 }
             },
@@ -513,7 +543,7 @@ impl Work{
     }
 }
 
-
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub enum ExitStatus{
     Finished,
     Errored(String),

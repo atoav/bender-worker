@@ -7,10 +7,10 @@ pub fn blender_in_path() -> bool{
     Ok(_) => true,
     Err(e) => {
         if let std::io::ErrorKind::NotFound = e.kind() {
-            println!(" ✖ [WORKER] Blender is not installed or not in PATH environment variable: {}", e);
+            eprintln!(" ✖ [WORKER] Blender is not installed or not in PATH environment variable: {}", e);
             false
         } else {
-            println!(" ✖ [WORKER] Blender --version returned Error: {}", e);
+            eprintln!(" ✖ [WORKER] Blender --version returned Error: {}", e);
             false
         }
     }, 
@@ -28,7 +28,7 @@ pub fn enough_space<P>(p: P, limit: u64) -> bool where P: Into<PathBuf>{
             space < limit
         },
         Err(err) => {
-            println!(" ✖ [WORKER] Error: Couldn't get available space: {}", err);
+            eprintln!(" ✖ [WORKER] Error: Couldn't get available space: {}", err);
             false
         }
     }
@@ -49,7 +49,7 @@ pub fn print_space_warning<P>(p: P, limit: u64) where P: Into<PathBuf>{
             }
         },
         Err(err) => {
-            println!(" ✖ [WORKER] Error: Couldn't get available space: {}", err);
+            eprintln!(" ✖ [WORKER] Error: Couldn't get available space: {}", err);
         }
     }
 }
