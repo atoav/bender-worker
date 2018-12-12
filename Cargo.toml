@@ -4,6 +4,7 @@ version = "0.1.0"
 authors = ["David Huss <dh@widerstandzwecklos.at>"]
 
 [dependencies]
+docopt = "1"
 app_dirs = "1.2"
 uuid = { version = "0.7", features = ["serde", "v4"] }
 fs2 = "0.4"

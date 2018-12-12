@@ -12,12 +12,14 @@ extern crate shlex;
 extern crate toml;
 extern crate bender_job;
 extern crate bender_mq;
+extern crate docopt;
 
 use std::fs;
 use std::process;
 use std::path::{PathBuf, Path};
 use app_dirs::*;
 use uuid::Uuid;
+use docopt::Docopt;
 use serde_derive::{Serialize, Deserialize};
 use dialoguer::Confirmation;
 use bender_mq::{Channel, BenderMQ};
@@ -29,16 +31,52 @@ pub mod system;
 pub mod work;
 use work::*;
 
-
-// use amqp::Basic;
-// use bender_mq::{Channel, BenderMQ};
-
-
-
 const APP_INFO: AppInfo = AppInfo{name: "Bender-Worker", author: "David Huss"};
 
+const USAGE: &'static str = "
+bender-worker
 
-fn main() {
+Usage:
+  bender-worker [--configure]
+  bender-worker config path
+  bender-worker (-h | --help)
+  bender-worker --version
+
+Options:
+  --configure   Run configuration
+  -h --help     Show this screen.
+  --version     Show version.
+";
+
+#[derive(Debug, Deserialize)]
+pub struct Args {
+    cmd_config: bool,
+    flag_configure: bool,
+    cmd_path: bool,
+}
+
+fn main(){
+    let args: Args = Docopt::new(USAGE)
+                            .and_then(|d| d.deserialize())
+                            .unwrap_or_else(|e| e.exit());
+
+    if args.cmd_config && args.cmd_path{
+        // Print just the path of the application folder
+        match get_app_root(AppDataType::UserConfig, &APP_INFO){
+            Err(err) => eprintln!("ERROR: Couldn't get application folder: {}", err),
+            Ok(app_savepath) => {
+                let mut p = app_savepath.clone();
+                p.push("config.toml");
+                println!("{}", p.to_string_lossy());
+            }
+        }
+    }else{
+        run(&args);
+    }
+}
+
+
+fn run(args: &Args) {
     // Get a valid application save path depending on the OS
     println!("\n{x} BENDER-WORKER {x}", x="=".repeat(24));
     match get_app_root(AppDataType::UserConfig, &APP_INFO){
@@ -47,7 +85,7 @@ fn main() {
             println!("Storing Application Data in:        {}", app_savepath.to_string_lossy().replace("\"", ""));
 
             // Load the configuration (or generate one if we are a first timer)
-            match config::get_config(&app_savepath){
+            match config::get_config(&app_savepath, &args){
                 Err(err) => {
                     let e = format!("{}", err);
                     if !e.contains("missing field"){

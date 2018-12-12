@@ -122,11 +122,11 @@ pub fn setup_outpath<P>(config: &mut Config, p: P) -> GenResult<()> where P: Int
 
 /// Try to read the Config from the config folder or generate one if it doesn't\
 /// exist and write it to disk
-pub fn get_config<P>(p: P) -> GenResult<Config> where P: Into<PathBuf>{
+pub fn get_config<P>(p: P, args: &Args) -> GenResult<Config> where P: Into<PathBuf>{
     let mut p = p.into();
     let d = p.clone();
     p.push("config.toml");
-    match Path::new(&p).exists(){
+    match Path::new(&p).exists() && !args.flag_configure{
         true => {
             println!("Reading the Configuration from:     {}", p.to_string_lossy());
             // Deserialize it from file
@@ -135,8 +135,10 @@ pub fn get_config<P>(p: P) -> GenResult<Config> where P: Into<PathBuf>{
         },
         false => {
             // No Config on disk. Create a new one and attempt to write it there
-            println!("No Configuration found at \"{}\"", p.to_string_lossy());
-            println!("Generating a new one");
+            if !args.flag_configure{
+                println!("No Configuration found at \"{}\"", p.to_string_lossy());
+                println!("Generating a new one");
+            }
             // Create directories on the way
             fs::create_dir_all(&d)?;
             // Get a new config

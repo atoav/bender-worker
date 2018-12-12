@@ -70,7 +70,7 @@ impl Work{
                   .filter(|t| t.is_waiting() || t.is_queued())
                   .count() < self.config.workload
                       &&
-                  okay_space
+                  !okay_space
                   
     }
 
