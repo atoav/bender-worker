@@ -78,6 +78,7 @@ fn main(){
                             .and_then(|d| d.deserialize())
                             .unwrap_or_else(|e| e.exit());
 
+
     if args.cmd_get && args.cmd_configpath{
         // Print just the path of the application folder
         match get_app_root(AppDataType::UserConfig, &APP_INFO){
