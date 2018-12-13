@@ -30,6 +30,7 @@ pub mod config;
 pub mod system;
 pub mod work;
 use work::*;
+use config::Config;
 
 const APP_INFO: AppInfo = AppInfo{name: "Bender-Worker", author: "David Huss"};
 
@@ -37,12 +38,21 @@ const USAGE: &'static str = "
 bender-worker
 
 Usage:
-  bender-worker [--configure]
-  bender-worker config path
+  bender-worker
+  bender-worker --configure
+  bender-worker clean [--force]
+  bender-worker clean blendfiles [--force]
+  bender-worker clean frames [--force]
+  bender-worker get configpath
+  bender-worker get outpath
+  bender-worker get blendpath
+  bender-worker get id
+  bender-worker get benderurl
   bender-worker (-h | --help)
   bender-worker --version
 
 Options:
+  --force, -f   Don't ask for confirmation, just do it
   --configure   Run configuration
   -h --help     Show this screen.
   --version     Show version.
@@ -50,9 +60,17 @@ Options:
 
 #[derive(Debug, Deserialize)]
 pub struct Args {
-    cmd_config: bool,
+    cmd_get: bool,
+    cmd_configpath: bool,
+    cmd_outpath: bool,
+    cmd_blendpath: bool,
+    cmd_benderurl: bool,
+    cmd_id: bool,
+    cmd_clean: bool,
+    cmd_blendfiles: bool,
+    cmd_frames: bool,
     flag_configure: bool,
-    cmd_path: bool,
+    flag_force: bool,
 }
 
 fn main(){
@@ -60,14 +78,146 @@ fn main(){
                             .and_then(|d| d.deserialize())
                             .unwrap_or_else(|e| e.exit());
 
-    if args.cmd_config && args.cmd_path{
+    if args.cmd_get && args.cmd_configpath{
         // Print just the path of the application folder
         match get_app_root(AppDataType::UserConfig, &APP_INFO){
-            Err(err) => eprintln!("ERROR: Couldn't get application folder: {}", err),
+            Err(err) => eprintln!(" ✖ Error: : Couldn't get application folder: {}", err),
             Ok(app_savepath) => {
                 let mut p = app_savepath.clone();
                 p.push("config.toml");
                 println!("{}", p.to_string_lossy());
+            }
+        }
+    // Read the config (if there is one) and get the path for frames
+    }else if args.cmd_get && args.cmd_outpath{
+        match get_app_root(AppDataType::UserConfig, &APP_INFO){
+            Err(err) => eprintln!(" ✖ Error: {}", err),
+            Ok(app_savepath) => {
+                let mut configpath = app_savepath.clone();
+                configpath.push("config.toml");
+                match Config::from_file(&configpath){
+                    Ok(config) => println!("{}", config.outpath.to_string_lossy()),
+                    Err(err) => eprintln!(" ✖ Error: {}", err)
+                }
+            }
+        }
+    // Read the config (if there is one) and get the path for blendfiles
+    }else if args.cmd_get && args.cmd_blendpath{
+        match get_app_root(AppDataType::UserConfig, &APP_INFO){
+            Err(_err) => (), // Couldn't get app_savepath
+            Ok(app_savepath) => {
+                let mut configpath = app_savepath.clone();
+                configpath.push("config.toml");
+                match Config::from_file(&configpath){
+                    Ok(config) => println!("{}", config.blendpath.to_string_lossy()),
+                    Err(err) => eprintln!(" ✖ Error: {}", err)
+                }
+            }
+        }
+    // Read the config (if there is one) and get the workers id
+    }else if args.cmd_get && args.cmd_id{
+        match get_app_root(AppDataType::UserConfig, &APP_INFO){
+            Err(_err) => (), // Couldn't get app_savepath
+            Ok(app_savepath) => {
+                let mut configpath = app_savepath.clone();
+                configpath.push("config.toml");
+                match Config::from_file(&configpath){
+                    Ok(config) => println!("{}", config.id),
+                    Err(err) => eprintln!(" ✖ Error: {}", err)
+                }
+            }
+        }
+    // Read the config (if there is one) and get the bender url
+    }else if args.cmd_get && args.cmd_benderurl{
+        match get_app_root(AppDataType::UserConfig, &APP_INFO){
+            Err(_err) => (), // Couldn't get app_savepath
+            Ok(app_savepath) => {
+                let mut configpath = app_savepath.clone();
+                configpath.push("config.toml");
+                match Config::from_file(&configpath){
+                    Ok(config) => println!("{}", config.bender_url),
+                    Err(err) => eprintln!(" ✖ Error: {}", err)
+                }
+            }
+        }
+    // Read the config (if there is one) and get the bender url
+    }else if args.cmd_clean{
+        match get_app_root(AppDataType::UserConfig, &APP_INFO){
+            Err(_err) => (), // Couldn't get app_savepath
+            Ok(app_savepath) => {
+                let mut configpath = app_savepath.clone();
+                configpath.push("config.toml");
+                match Config::from_file(&configpath){
+                    Ok(config) => {
+                        if args.flag_force{
+                            if args.cmd_blendfiles || (!args.cmd_blendfiles && !args.cmd_frames) {
+                                let p = config.blendpath.to_string_lossy().to_string();
+                                match fs::remove_dir_all(&p){
+                                    Ok(_) => {
+                                        println!(" ✔ Deleted the contents of {}", p);
+                                        match fs::create_dir_all(&p){
+                                            Ok(_) => (),
+                                            Err(err) => eprintln!(" ✖ Error: Couldn't recreate directory: {}", err)
+                                        }
+                                    },
+                                    Err(err) => eprintln!(" ✖ Error while deleting in {}: {}", p, err)
+                                }
+                            }
+
+                            if args.cmd_frames || (!args.cmd_blendfiles && !args.cmd_frames) {
+                                let p = config.outpath.to_string_lossy().to_string();
+                                match fs::remove_dir_all(&p){
+                                    Ok(_) => {
+                                        println!(" ✔ Deleted the contents of {}", p);
+                                        match fs::create_dir_all(&p){
+                                            Ok(_) => (),
+                                            Err(err) => eprintln!(" ✖ Error: Couldn't recreate directory: {}", err)
+                                        }
+                                    },
+                                    Err(err) => eprintln!(" ✖ Error while deleting in {}: {}", p, err)
+                                }
+                            }
+                        }else{
+                            if args.cmd_blendfiles || (!args.cmd_blendfiles && !args.cmd_frames) {
+                                let p = config.blendpath.to_string_lossy().to_string();
+                                let msg = format!("Delete all files at {} ?", p);
+                                if Confirmation::new().with_text(&msg).interact().unwrap(){
+                                    match fs::remove_dir_all(&p){
+                                        Ok(_) => {
+                                            println!(" ✔ Deleted the contents of {}", p);
+                                            match fs::create_dir_all(&p){
+                                                Ok(_) => (),
+                                                Err(err) => eprintln!(" ✖ Error: Couldn't recreate directory: {}", err)
+                                            }
+                                        },
+                                        Err(err) => eprintln!(" ✖ Error while deleting in {}: {}", p, err)
+                                    }
+                                }
+                            }
+
+                            if args.cmd_frames || (!args.cmd_blendfiles && !args.cmd_frames) {
+                                let p = config.outpath.to_string_lossy().to_string();
+                                let msg = format!("Delete all files at {} ?", p);
+                                if Confirmation::new().with_text(&msg).interact().unwrap(){
+                                    match fs::remove_dir_all(&p){
+                                        Ok(_) => {
+                                            println!(" ✔ Deleted the contents of {}", p);
+                                            match fs::create_dir_all(&p){
+                                                Ok(_) => (),
+                                                Err(err) => eprintln!(" ✖ Error: Couldn't recreate directory: {}", err)
+                                            }
+                                        },
+                                        Err(err) => eprintln!(" ✖ Error while deleting in {}: {}", p, err)
+                                    }
+                                }
+                            }
+                            
+                        }
+                    },
+                    Err(err) => eprintln!("Error: there was no config.toml at {path}: {err}", 
+                        path=&app_savepath.to_string_lossy(),
+                        err=err)
+                }
             }
         }
     }else{
