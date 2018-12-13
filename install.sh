@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/bash
 echo 'Building bender-worker and its dependencies'
 echo
 cargo build --release
@@ -6,7 +6,7 @@ cargo build --release
 echo
 
 read -e -p "
-Copy the compiled binary from target/release/bender-worker to /usr/local/bin/bender-wworker? [Y/n] " YN
+Copy the compiled binary from target/release/bender-worker to /usr/local/bin/bender-worker? [Y/n] " YN
 
 [[ $YN == "y" || $YN == "Y" || $YN == "" ]] && sudo cp target/release/bender-worker /usr/local/bin/bender-worker
 
