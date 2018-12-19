@@ -28,7 +28,9 @@ pub fn enough_space<P>(p: P, limit: u64) -> bool where P: Into<PathBuf>{
             space < limit
         },
         Err(err) => {
-            eprintln!(" ✖ [WORKER] Error: Couldn't get available space: {}", err);
+            eprintln!(" ✖ [WORKER] Error: Couldn't get available space for path \"{}\": {}", 
+                p.to_string_lossy(),
+                err);
             false
         }
     }
