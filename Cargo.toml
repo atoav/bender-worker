@@ -2,24 +2,23 @@
 name = "bender-worker"
 version = "0.1.0"
 authors = ["David Huss <dh@widerstandzwecklos.at>"]
+workspace = ".."
 
 [dependencies]
-docopt = "1"
-colored = "1.6"
+amqp = { version = "0.1.2", default-features = false }
 app_dirs = "1.2"
-uuid = { version = "0.7", features = ["serde", "v4"] }
-fs2 = "0.4"
-shlex = "0.1"
-itertools = "0.7"
+chrono = "0.4"
+colored = "1.6"
 dialoguer = "0.3"
+docopt = "1"
+fs2 = "0.4"
+hyper = "0.12"
+itertools = "0.7"
 serde = "1"
 serde_derive = "1"
+shlex = "0.1"
 toml = "0.4"
-chrono = "0.4"
-hyper = "0.12"
-bender_job = { git = "ssh://git@code.hfbk.net:4242/bendercode/bender-job.git" }
-bender_mq = { git = "ssh://git@code.hfbk.net:4242/bendercode/bender-mq.git" }
+uuid = { version = "0.7", features = ["serde", "v4"] }
 
-[dependencies.amqp]
-version = "0.1.2"
-default-features = false
+bender_job = { path = "../bender-job" }
+bender_mq = { path = "../bender-mq" }
