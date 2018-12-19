@@ -233,7 +233,7 @@ fn run(args: &Args) {
     // Get a valid application save path depending on the OS
     println!("\n{x} BENDER-WORKER {x}", x="=".repeat(24));
     match get_app_root(AppDataType::UserConfig, &APP_INFO){
-        Err(err) => println!("{}", format!(" ✖ Error: Couldn't get application folder: {}", err).red()),
+        Err(err) => eprintln!("{}", format!(" ✖ Error: Couldn't get application folder: {}", err).red()),
         Ok(app_savepath) => {
             println!("Storing Application Data in:        {}", app_savepath.to_string_lossy().replace("\"", "").bold());
 
@@ -242,10 +242,10 @@ fn run(args: &Args) {
                 Err(err) => {
                     let e = format!("{}", err);
                     if !e.contains("missing field"){
-                        println!("{}", format!(" ✖ Error: Couldn't generate/read config file: {}", err).red());
+                        eprintln!("{}", format!(" ✖ Error: Couldn't generate/read config file: {}", err).red());
                     }else{
-                        println!("{}", format!(" ✖ Error: The existing configuration misses a field: {}", err).red());
-                        let msg = "Do you want to generate a new one? (this overrides the existing configuration)".on_bright_red();
+                        eprintln!("{}", format!(" ✖ Error: The existing configuration misses a field: {}", err).red());
+                        let msg = "Do you want to generate a new one? (this overrides the existing configuration)".on_red();
                         if Confirmation::new().with_text(&msg).interact().unwrap(){
                             let mut p = PathBuf::from(&app_savepath);
                             p.push("config.toml");
@@ -257,6 +257,16 @@ fn run(args: &Args) {
                 },
                 Ok(config) => {
                     if !system::blender_in_path(){
+                        eprintln!("{}", format!(" ✖ Error: Found no 'blender' command in the PATH. Make sure it is installed and in PATH environment variable").on_red());
+                        process::exit(1);
+                    }
+
+                    if !config.outpath.exists(){
+                        let mut configpath = app_savepath.clone();
+                    configpath.push("config.toml");
+                        eprintln!("{}", format!(" ✖ Error: the path specified as output path in {} does not exist or is not writeable!", configpath.to_string_lossy()).on_red());
+                        println!("Please either create the path at {} or modify the config with bender-worker --configure", 
+                            config.outpath.to_string_lossy() );
                         process::exit(1);
                     }
                     // We sucessfullt created a config file, let's go ahead
