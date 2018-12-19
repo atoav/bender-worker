@@ -16,6 +16,7 @@ use hyper::http::Request;
 use hyper::rt::{self, Future, Stream};
 use std::process::{Stdio};
 use std::io::{BufRead, BufReader};
+use std::{thread, time};
 // use config::GenResult;
 
 
@@ -502,8 +503,10 @@ impl Work{
             let url = format!("{url}/job/{id}", url=url, id=id);
             let mut request = Request::builder();
             request.uri(url)
+                   .header("content-type", "application/json")
                    .header("User-Agent", "bender-worker");
-            let request = request.body(Body::empty()).unwrap();
+                   let json = r#"{"request":"blendfile"}"#;
+            let request = request.body(Body::from(json)).expect("Creating request failed! ");
 
             // The actual request
             client.request(request)
@@ -513,15 +516,24 @@ impl Work{
                         // each chunk of the body and writes the file to the 
                         println!(" ✚ [WORKER] Downloading blendfile to {path}", path=savepath.to_string_lossy());
                         // Create File
-                        let mut file = File::create(&savepath).unwrap();
                         let status = response.status().clone();
                         // Write all chunks
                         response.into_body().for_each(move |chunk| {
                             if status.is_success() {
-                                file.write_all(&chunk)
-                                    .map_err(|e| panic!(" ✖ [WORKER] Error: Couldn't write Chunks to file: {}", e))
+                                let file =  File::create(&savepath);
+                                match file{
+                                    Ok(mut f) => f.write_all(&chunk)
+                                                 .map_err(|e| panic!(" ✖ [WORKER] Error: Couldn't write Chunks to file: {}", e)),
+                                    Err(err) => {
+                                        eprintln!("{}", format!(" ✖ [WORKER] Error: Couldn't write requested blendfile to path {}: {}",
+                                            savepath.to_string_lossy(),
+                                            err).red());
+                                        std::io::sink().write_all(&chunk)
+                                        .map_err(|e| panic!(" ✖ [WORKER] Error: Couldn't write Chunks to sink: {}", e))
+                                    }
+                                }
                             }else{
-                                println!(" ❗ [WORKER] Warning: The Server responded with: {}", status);
+                                println!("{}", format!(" ❗ [WORKER] Warning: The Server responded with: {}", status).yellow());
                                 std::io::sink().write_all(&chunk)
                                     .map_err(|e| panic!(" ✖ [WORKER] Error: Couldn't write Chunks to sink: {}", e))
                             }
@@ -532,9 +544,11 @@ impl Work{
                   })
                   .map_err(move |err| {
                         if format!("{}", err).contains("(os error 111)") {
-                            eprintln!(" ✖ [WORKER] There is no server running at {}: {}", url2, err);
+                            eprintln!("{}", format!(" ✖ [WORKER] There is no server running at {}: {}", url2, err).red());
+                            let duration = time::Duration::from_millis(2000);
+                            thread::sleep(duration);
                         }else{
-                            eprintln!(" ✖ [WORKER] Error {}", err);
+                            eprintln!("{}", format!(" ✖ [WORKER] Error {}", err).red());
                         }
                   })
         }));
