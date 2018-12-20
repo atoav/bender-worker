@@ -1,3 +1,7 @@
+//! The config module defines the Config Struct as well as initialization \
+//! methods to interactively create a configuration file. The format of choice \
+//! is toml. The config will be stored at the path returned by the app_dirs crate.
+//! On Linux this should be `~/.config/Bender-Worker/config.toml`
 use ::*;
 use std::error::Error;
 use std::fs;

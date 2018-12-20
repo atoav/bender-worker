@@ -1,3 +1,10 @@
+//! The bender-worker is a multi-plattform client for the bender-renderfarm. It \
+//! receives it's tasks via amqp/rabbitmq, requests blendfiles from flaskbender \
+//! via http GET, renders the Tasks and stores the rendered Frames on disk.
+//!
+//! You can configure it via `bender-worker --configure`. If you want to see what \
+//! else is possible (besides just running it) check `bender-worker -h`
+
 extern crate app_dirs;
 extern crate serde;
 extern crate fs2;
@@ -37,13 +44,14 @@ use config::Config;
 pub mod work;
 use work::*;
 
-pub mod blendfile;
-use blendfile::*;
-
 const APP_INFO: AppInfo = AppInfo{name: "Bender-Worker", author: "David Huss"};
 
 const USAGE: &'static str = "
 bender-worker
+
+The bender-worker is a multi-plattform client for the bender-renderfarm. It \
+receives it's tasks via amqp/rabbitmq, requests blendfiles from flaskbender \
+via http GET, renders the Tasks and stores the rendered Frames on disk.
 
 Usage:
   bender-worker
