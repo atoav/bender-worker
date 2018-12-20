@@ -67,7 +67,7 @@ impl Work{
 
         // Get the blendfile from the server only if there are 
         // tasks that actually need one
-        if self.has_task(){
+        if self.has_task() && self.tasks.iter().any(|t| !t.is_ended()){
             self.get_blendfiles();
             self.add_paths_to_tasks();
         }
@@ -85,6 +85,7 @@ impl Work{
         // Figure out if a blendfile's tasks are all finished. If so request the\
         // job status from flaskbender. If the job has finished and a certain grace\
         // period has passed, delete the blendfile in question
+        self.cleanup_blendfiles();
 
         // Print a divider
         if self.has_task(){

@@ -23,7 +23,8 @@ pub struct Config{
     pub blendpath: PathBuf,
     pub outpath: PathBuf,
     pub disklimit: u64,
-    pub workload: usize
+    pub workload: usize,
+    pub grace_period: i64
 }
 
 
@@ -38,9 +39,10 @@ impl Config{
             bender_url: bender_url,           // URL of the bender frontend
             id: Uuid::new_v4(),               // Random UUID on start, then from disk
             blendpath: PathBuf::new(),        // Path to where the blendfiles should be stored
-            outpath: PathBuf::new(),        // Path to where the rendered frames should be stored
+            outpath: PathBuf::new(),          // Path to where the rendered frames should be stored
             disklimit: 200*1_000_000,         // In MB
             workload: 1,                      // How many frames to take at once
+            grace_period: 60                  // How many seconds to keep blendfiles around before deletion
         }
     }
 

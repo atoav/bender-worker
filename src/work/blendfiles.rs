@@ -23,6 +23,77 @@ use bender_job::{Status, Task};
 
 
 impl Work{
+    /// Delete finished blendfiles that are done and overdue
+    pub fn cleanup_blendfiles(&mut self) {
+        // Collect all Blendfile IDs that have all their tasks finished.
+        let potentially_finished: Vec<String> = 
+        self.blendfiles.iter()
+                        .filter(|(_, b)|b.is_some())
+                        .filter(|(job_id, _)|{
+                            // Filter out jobs with unfinished jobs
+                            self.get_tasks_for_parent_id(job_id.as_str()).iter()
+                                                                 .all(|t|{
+                                                                    t.is_ended()
+                                                                 })
+                        })
+                        .filter(|(_, entry)|{
+                            // Filter out jobs that are still within the grace period
+                            match entry{
+                                Some(bf) => bf.is_over_grace_period(std::time::Duration::from_secs(60)),
+                                None => false
+                            }
+                            
+                        })
+                        .map(|(id, _)| id.clone())
+                        .collect();
+
+        // TODO: Implement request for Job status here
+        let shall_finish = potentially_finished;
+
+        // Remove tasks that are contained in finished blendfiles
+        self.tasks.retain(|ref task| shall_finish.contains(&task.parent_id));
+
+        // Transform the ids into  a tuple with ids and paths
+        let shall_finish: Vec<(String, PathBuf)> =
+        shall_finish.iter()
+                    .map(|id| {
+                        let id = id.clone();
+                        let p = self.blendfiles.get_mut(id.as_str()).cloned();
+                        let p = p.unwrap().unwrap().path;
+                        (id, p)
+                    })
+                    .collect();
+
+        // Actually go and delete the blendfiles and erase them from self.blendfiles
+        shall_finish.iter()
+                    .map(|(id, path)|{
+                        let erase: bool = 
+                        match path.exists(){
+                            true => {
+                                match fs::remove_file(&path){
+                                    Ok(_) => {
+                                        println!("{}", format!(" ✔️ [WORKER] Deleted blendfile for finished job [{}]", id).green());
+                                        true
+                                    },
+                                    Err(err) => {
+                                        eprintln!("{}", format!(" ✖ [WORKER] Error: Couldn't delete blendfile for finished job ({}): {}", path.to_string_lossy(), err).red());
+                                        false
+                                    }
+                                }
+                            },
+                            false =>{
+                                 println!("ಠ_ಠ [WORKER] Tried to delete blendfile for finished job at {}, but it was already gone... that is okay I guess..", path.to_string_lossy());
+                                 true
+                            }
+                        };
+                        (id, erase)
+                    })
+                    .filter(|&(_, erase)| erase)
+                    .for_each(|(id, _)| {
+                        let _ = self.blendfiles.remove(id.as_str());
+                        println!("{}", format!(" ✔️ [WORKER] Forgot blendfile for [{}]", id).green());
+                    } );
+    }
 
     /// Deals with reqeusting new blendfiles
     pub fn get_blendfiles(&mut self){
@@ -121,6 +192,7 @@ impl Work{
     pub fn unique_parent_ids<'a>(&'a self) -> impl Iterator<Item = &str> + 'a{
         self.tasks
             .iter()
+            .filter(|t| !t.is_ended())
             .map(|task| task.parent_id.as_str())
             .unique()
     }
@@ -201,6 +273,13 @@ impl Blendfile{
         let middle = d.len()/2;
         d[middle]
     }
+
+    /// Returns true if the last access has happened a longer time ago than the \
+    /// supplied grace period. Note that the grace_duration is a std::time::Duration
+    pub fn is_over_grace_period(&self, grace_duration: std::time::Duration) -> bool{
+        println!("Duration since last access: {}", format_duration(self.since_last_access()));
+        self.since_last_access().to_std().unwrap() > grace_duration
+    }
 }
 
 
@@ -233,10 +312,10 @@ pub fn format_duration(duration: Duration) -> String {
         format!("{s}.{ms} s", s=s, ms=ms)
     }else if w == 0 && d == 0 && h == 0{
         // We have a duration with minutes and seconds
-        format!("{min}:{s}.{ms}", min=min, s=s, ms=ms)
+        format!("{min:02}:{s:02}.{ms}", min=min, s=s, ms=ms)
     }else if w == 0 && d == 0{
         // We have a duration with hours
-        format!("{h}:{min}:{s}", h=h, min=min, s=s)
+        format!("{h}:{min:02}:{s:02}", h=h, min=min, s=s)
     }else if w == 0 {
         // We have a duration with days
         format!("{d} {d_label} {h} {h_label} {min} min", 

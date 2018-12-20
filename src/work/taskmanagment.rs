@@ -78,6 +78,14 @@ impl Work{
         self.tasks.len() > 0
     }
 
+    /// Return all tasks that have a given parent id
+    pub fn get_tasks_for_parent_id<S>(&self, id: S) -> Vec<&Task> where S: Into<String>{
+        let id = id.into();
+        self.tasks.iter()
+                  .filter(|&task| task.parent_id == id)
+                  .collect()
+    }
+
 
     /// Returns a Reference to the next Task only if there is no Task running
     /// Only works on tasks with a constructed Command

@@ -7,7 +7,7 @@ use std::process::{Stdio};
 use std::io::{BufRead, BufReader};
 use std::process::Command;
 use std::time::Duration;
-use console::{Term, measure_text_width};
+// use console::{Term, measure_text_width};
 
 
 
@@ -148,11 +148,13 @@ pub fn process_stdout(child:&mut std::process::Child){
                   .filter_map(|line| line.ok())
                   .filter(|line| line.trim() != "")
                   .for_each(|line| {
-                    let term = Term::stdout();
-                    let w = term.size().1 as usize;
                     let message = format!("   [WORKER][COMMAND] {}", line).dimmed();
-                    let lines = measure_text_width(&message.to_string()) / w;
-                    let _ = term.clear_last_lines(lines+1);
+                    
+                    // let term = Term::stdout();
+                    // let w = term.size().1 as usize;
+                    // let lines = measure_text_width(&message.to_string()) / w;
+                    // let _ = term.clear_last_lines(lines+1);
+                    
                     println!("{}", message);
                   });
         },
