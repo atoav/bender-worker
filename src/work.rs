@@ -16,7 +16,6 @@ use hyper::http::Request;
 use hyper::rt::{self, Future, Stream};
 use std::process::{Stdio};
 use std::io::{BufRead, BufReader};
-use std::{thread, time};
 // use config::GenResult;
 
 
@@ -27,9 +26,9 @@ pub struct Work{
     pub tasks: Vec<Task>,
     pub current: Option<Task>,
     pub history: History,
-    pub frames: Vec<PathBuf>,
-    pub blendfiles: HashMap<String, Option<PathBuf>>,
-    command: Option<std::process::Child>
+    pub blendfiles: HashMap<String, Option<Blendfile>>,
+    command: Option<std::process::Child>,
+    display_divider: bool
 }
 
 
@@ -42,9 +41,9 @@ impl Work{
             tasks: Vec::<Task>::new(),
             current: None,
             history: History::new(),
-            frames: Vec::<PathBuf>::new(),
-            blendfiles: HashMap::<String, Option<PathBuf>>::new(),
-            command: None
+            blendfiles: HashMap::<String, Option<Blendfile>>::new(),
+            command: None,
+            display_divider: true
         }
     }
 
@@ -55,7 +54,7 @@ impl Work{
 
     /// Add a ad ID:Blendfilepath pair to the Hashmap
     pub fn add_blendfile<S, P>(&mut self, id: S, path: P) where S: Into<String>, P: Into<PathBuf> {
-        self.blendfiles.insert(id.into(), Some(path.into()));
+        self.blendfiles.insert(id.into(), Some(Blendfile::new(path.into())));
     }
 
     /// Returns true if a new task should be added. This depends on two factors:
@@ -64,8 +63,10 @@ impl Work{
     pub fn should_add(&self) -> bool{
         let okay_space = system::enough_space(&self.config.outpath, self.config.disklimit);
         if okay_space{
-            println!(" ❗ [WORKER] Warning: Taking no new jobs");
+            eprintln!("{}", format!(" ❗ [WORKER] Warning: Taking no new jobs").black().on_yellow());
             system::print_space_warning(&self.config.outpath, self.config.disklimit);
+            let timeout = Duration::from_secs(5);
+            sleep(timeout);
         }
         self.tasks.iter()
                   .filter(|t| t.is_waiting() || t.is_queued())
@@ -110,9 +111,9 @@ impl Work{
     /// Returns the path to the blendfile if it has one
     pub fn get_blendfile_for_task(&self, t: &Task) -> Option<PathBuf>{
         match self.blendfiles.get(&t.parent_id){
-            Some(ref entry) => {
-                match entry{
-                    Some(p) => Some(p.clone()),
+            Some(ref blendfile) => {
+                match blendfile{
+                    Some(bf) => Some(bf.path.clone()),
                     None => None
                 }
             },
@@ -163,10 +164,11 @@ impl Work{
                 Some(mut t) => {
                     t.start();
                     println!(" ✚ [WORKER] Queued task [{}] for job [{}]", t.id, t.parent_id);
+                    self.display_divider = true;
                     let routing_key = format!("worker.{}", self.config.id);
                     match channel.post_task_info(&t, routing_key){
                         Ok(_) => (),
-                        Err(err) => eprintln!(" ✖ [WORKER] Error: Couldn't post current task to info queue: {}", err)
+                        Err(err) => eprintln!("{}", format!(" ✖ [WORKER] Error: Couldn't post current task to info queue: {}", err).red())
                     }
                     self.current = Some(t);
                 },
@@ -201,11 +203,30 @@ impl Work{
             // Post the updated Task Info
             let routing_key = format!("worker.{}", self.config.id);
             if let Err(err) = channel.post_task_info(&t, routing_key){
-                eprintln!(" ✖ [WORKER] Error: Couldn't post current task to info queue: {}", err)
+                eprintln!("{}", format!(" ✖ [WORKER] Error: Couldn't post current task to info queue: {}", err).red())
             }
 
             moved = true;
-            println!(" ✔️ [WORKER] Finished task [{}] for job [{}]", t.id, t.parent_id);
+            match self.blendfiles.get_mut(&t.parent_id){
+                Some(mut opt_bf) => {
+                    match opt_bf{
+                        Some(ref mut bf) => {
+                            bf.increment_frame();
+                            let duration = bf.last_frame_duration().unwrap();
+                            let average = bf.average_duration();
+                            println!("{}", format!(" ✔️ [WORKER] Finished task [{task_id}] for job [{job_id}] (Duration: {duration}, Average Duration: {average})", 
+                                task_id=t.id, 
+                                job_id=t.parent_id,
+                                duration=format_duration(duration),
+                                average=format_duration(average)).on_green(),
+                            );
+                            self.display_divider = true;
+                        },
+                        None => eprintln!("{}", format!(" ✖ [WORKER] Error: Couldn't find Job with ID {} in self.blendfiles... This must be a bug!", t.parent_id).red())
+                    }
+                },
+                None => eprintln!("{}", format!(" ✖ [WORKER] Error: Couldn't find Job with ID {} in self.blendfiles... This must be a bug!", t.parent_id).red())
+            }
         }
 
         if moved{
@@ -221,14 +242,13 @@ impl Work{
         // let c =  self.clone();
         if let Some(ref mut t) = self.current{
             t.error();
-            println!(" ✚ [WORKER] Task Errored: {}", err);
             self.tasks.push(t.clone());
             moved = true;
-            println!(" ✖ [WORKER] Errored task [{}] for job [{}]: {}", t.id, t.parent_id, err);
+            eprintln!("{}", format!(" ✖ [WORKER] Errored task [{}] for job [{}]: {}", t.id, t.parent_id, err).red());
             let routing_key = format!("worker.{}", self.config.id);
             match channel.post_task_info(&t, routing_key){
                 Ok(_) => (),
-                Err(err) => eprintln!(" ✖ [WORKER] Error: Couldn't post current task to info queue: {}", err)
+                Err(err) => eprintln!("{}", format!(" ✖ [WORKER] Error: Couldn't post current task to info queue: {}", err).red())
             }
         }
 
@@ -263,6 +283,9 @@ impl Work{
         // Dispatch a Command for the current Task ("self.current")
         self.run_command(channel);
 
+        if self.has_task(){
+            self.print_divider();
+        }
     }
 
 
@@ -293,7 +316,7 @@ impl Work{
                             self.tasks.push(t);
                         },
                         Err(err) => {
-                            println!(" ✖ [WORKER] Error: Couldn't deserialize Task from message.body: {}", err);
+                            eprintln!("{}", format!(" ✖ [WORKER] Error: Couldn't deserialize Task from message.body: {}", err).red());
                             // Always try to acknowledge received messages that couldn't be decoded
                             remaining_delivery_tags.push(message.reply.delivery_tag);
                         }
@@ -304,7 +327,7 @@ impl Work{
         // to avoid the accumulation of garbage in the queue
         for tag in remaining_delivery_tags.iter(){
             if let Err(err) = channel.basic_ack(*tag, false){
-                println!(" ✖ [WORKER] Error: acknowledgment failed for received message: {}", err);
+                eprintln!("{}", format!(" ✖ [WORKER] Error: acknowledgment failed for received message: {}", err).red());
             }
         }
     }
@@ -318,9 +341,9 @@ impl Work{
                   .filter(|task| !task.data.contains_key("blendfile"))
                   .for_each(|task|{
                       match blendfiles.get(&task.parent_id){
-                          Some(entry) => {
-                            match entry{
-                                Some(p) => task.add_data("blendfile", &p.to_string_lossy()),
+                          Some(blendfile) => {
+                            match blendfile{
+                                Some(bf) => task.add_data("blendfile", &bf.path.to_string_lossy()),
                                 None => ()
                             }
                           },
@@ -355,6 +378,7 @@ impl Work{
                 if out.exists(){
                     let outstr = out.clone().to_string_lossy().to_string();
                     task.construct(p, outstr);
+                    self.display_divider = true;
                     match task.command{
                         bender_job::Command::Blender(ref c) => println!(" ✚ [WORKER] Constructed task for frame [{}]", c.frame),
                         _ => println!(" ✚ [WORKER] Constructed generic task [{}]", task.id)
@@ -382,7 +406,7 @@ impl Work{
                                                    .stderr(Stdio::piped())
                                                    .spawn(){
                                 Ok(c) => {
-                                    println!(" ◯ [WORKER] Dispatched Command: \"blender {}\"", args.join(" "));
+                                    println!(" ⚟ [WORKER] Dispatched Command: \"blender {}\"", args.join(" "));
                                     self.command = Some(c);
                                     ExitStatus::Running
                                 },
@@ -469,11 +493,11 @@ impl Work{
                 .for_each(|id|{
                     let p = self.request_blendfile(id.to_owned());
                     // println!("{:?}", p);
-                    let p =match p.as_path().exists(){
-                        true => Some(p),
+                    let opt_bf = match p.as_path().exists(){
+                        true => Some(Blendfile::new(p)),
                         false => None
                     };
-                    self.blendfiles.insert(id.to_string(), p);
+                    self.blendfiles.insert(id.to_string(), opt_bf);
                     
                  });
 
@@ -481,12 +505,14 @@ impl Work{
         }
 
         if ids.len() == self.blendfiles.iter().map(|(_,x)| x).filter(|e|e.is_some()).count(){
-            println!(" ✚ [WORKER] Downloaded all blendfiles");
+            println!("{}", format!(" ✔️ [WORKER] Downloaded all blendfiles").green());
+            self.display_divider = true;
         }
     }
 
-    /// Request a single blendfile for a given Job-ID from flaskbender via http
-    /// get request. Uses the User-Agent http header to request the actual file
+    /// Request a single blendfile for a given Job-ID from flaskbender via http \
+    /// get request. Uses the User-Agent http header in combination with a json \
+    /// body to get the actual blendfile
     pub fn request_blendfile<S>(&mut self, id: S) -> PathBuf where S: Into<String>{
         let id = id.into();
         let url = self.config.bender_url.clone();
@@ -511,42 +537,48 @@ impl Work{
             // The actual request
             client.request(request)
                   .and_then(move |response| {
+                        println!(" ⛁ [WORKER] Downloading blendfile to {path}", path=savepath.to_string_lossy());
                         // The body is a stream, and for_each returns a new Future
                         // when the stream is finished, and calls the closure on
-                        // each chunk of the body and writes the file to the 
-                        println!(" ✚ [WORKER] Downloading blendfile to {path}", path=savepath.to_string_lossy());
-                        // Create File
+                        // each chunk of the body and writes the file to the file
                         let status = response.status().clone();
-                        // Write all chunks
+                        // Run the closure on each of the chunks
                         response.into_body().for_each(move |chunk| {
                             if status.is_success() {
-                                let file =  File::create(&savepath);
+                                // Create File only if it doesn't exist yet,
+                                // if it _exists_ open it instead!
+                                let file =  match savepath.exists(){
+                                    false => File::create(&savepath),
+                                    true => File::open(&savepath)
+                                };
+
+                                // Discard Chunks when the file is not ok
                                 match file{
                                     Ok(mut f) => f.write_all(&chunk)
-                                                 .map_err(|e| panic!(" ✖ [WORKER] Error: Couldn't write Chunks to file: {}", e)),
+                                                 .map_err(|e| panic!(format!(" ✖ [WORKER] Error: Couldn't write Chunks to file: {}", e).red())),
                                     Err(err) => {
                                         eprintln!("{}", format!(" ✖ [WORKER] Error: Couldn't write requested blendfile to path {}: {}",
                                             savepath.to_string_lossy(),
                                             err).red());
                                         std::io::sink().write_all(&chunk)
-                                        .map_err(|e| panic!(" ✖ [WORKER] Error: Couldn't write Chunks to sink: {}", e))
+                                        .map_err(|e| panic!("{}", format!(" ✖ [WORKER] Error: Couldn't write Chunks to sink: {}", e).red()))
                                     }
                                 }
                             }else{
                                 println!("{}", format!(" ❗ [WORKER] Warning: The Server responded with: {}", status).yellow());
                                 std::io::sink().write_all(&chunk)
-                                    .map_err(|e| panic!(" ✖ [WORKER] Error: Couldn't write Chunks to sink: {}", e))
+                                    .map_err(|e| panic!(format!(" ✖ [WORKER] Error: Couldn't write Chunks to sink: {}", e).on_red()))
                             }
                         })
                   })
                   .map(move |_| {
-                        println!(" ✚ [WORKER] Sucessfully saved blendfile for job [{}]", id);
+                        println!(" ⛁ [WORKER] Sucessfully saved blendfile for job [{}]", id);
                   })
                   .map_err(move |err| {
                         if format!("{}", err).contains("(os error 111)") {
                             eprintln!("{}", format!(" ✖ [WORKER] There is no server running at {}: {}", url2, err).red());
-                            let duration = time::Duration::from_millis(2000);
-                            thread::sleep(duration);
+                            let timeout = Duration::from_secs(2);
+                            sleep(timeout);
                         }else{
                             eprintln!("{}", format!(" ✖ [WORKER] Error {}", err).red());
                         }
@@ -555,8 +587,18 @@ impl Work{
             // If everything worked out, insert the id with the path to the file into the values
             savepath2
     }
+
+    /// Print a horizontal divider if the flag is set and reset the flag afterwards
+    fn print_divider(&mut self) {
+        if self.display_divider {
+            println!("{}", "-".repeat(width()));
+            self.display_divider = false;
+        }
+    }
 }
 
+
+/// Holds the Exit Status of Command calls
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub enum ExitStatus{
     Finished,
@@ -566,7 +608,7 @@ pub enum ExitStatus{
 }
 
 
-
+/// Process the stdout of Command calls
 pub fn process_stdout(child:&mut std::process::Child){
     match child.stdout{
         Some(ref mut stdout) => {
@@ -578,6 +620,6 @@ pub fn process_stdout(child:&mut std::process::Child){
                     // println!("   [WORKER] {}", line);
                   });
         },
-        None => eprintln!(" ✖ [WORKER] Error: Couldn't get stdout")
+        None => eprintln!("{}", format!(" ✖ [WORKER] Error: Couldn't get stdout").red())
     }
 }

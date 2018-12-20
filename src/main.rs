@@ -14,6 +14,7 @@ extern crate bender_job;
 extern crate bender_mq;
 extern crate docopt;
 extern crate colored;
+extern crate console;
 
 use std::fs;
 use colored::*;
@@ -24,15 +25,20 @@ use uuid::Uuid;
 use docopt::Docopt;
 use serde_derive::{Serialize, Deserialize};
 use dialoguer::Confirmation;
+use console::Term;
 use bender_mq::{Channel, BenderMQ};
 
 
+pub mod system;
 
 pub mod config;
-pub mod system;
+use config::Config;
+
 pub mod work;
 use work::*;
-use config::Config;
+
+pub mod blendfile;
+use blendfile::*;
 
 const APP_INFO: AppInfo = AppInfo{name: "Bender-Worker", author: "David Huss"};
 
@@ -74,6 +80,9 @@ pub struct Args {
     flag_configure: bool,
     flag_force: bool,
 }
+
+
+
 
 fn main(){
     let args: Args = Docopt::new(USAGE)
@@ -229,9 +238,20 @@ fn main(){
 }
 
 
+
+
+/// Return the width of the terminal
+fn width() -> usize{
+    let term = Term::stdout();
+    term.size().1 as usize
+}
+
+
+
+
 fn run(args: &Args) {
     // Get a valid application save path depending on the OS
-    println!("\n{x} BENDER-WORKER {x}", x="=".repeat(24));
+    println!("\n{x} BENDER-WORKER {x}", x="=".repeat((width()-15)/2));
     match get_app_root(AppDataType::UserConfig, &APP_INFO){
         Err(err) => eprintln!("{}", format!(" ✖ Error: Couldn't get application folder: {}", err).red()),
         Ok(app_savepath) => {
