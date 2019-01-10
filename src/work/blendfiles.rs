@@ -39,7 +39,7 @@ impl Work{
                         .filter(|(_, entry)|{
                             // Filter out jobs that are still within the grace period
                             match entry{
-                                Some(bf) => bf.is_over_grace_period(std::time::Duration::from_secs(60)),
+                                Some(bf) => bf.is_over_grace_period(std::time::Duration::from_secs(self.config.grace_period)),
                                 None => false
                             }
                             

@@ -24,7 +24,7 @@ pub struct Config{
     pub outpath: PathBuf,
     pub disklimit: u64,
     pub workload: usize,
-    pub grace_period: i64
+    pub grace_period: u64
 }
 
 
