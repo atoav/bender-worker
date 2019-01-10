@@ -25,6 +25,7 @@ impl Work {
         savepath.push(format!("{id}.blend", id=id));
 
         let savepath2 = savepath.clone();
+        let savepath3 = savepath.clone();
 
         // Run in own thread with future
         rt::run(rt::lazy(move || {
@@ -76,7 +77,9 @@ impl Work {
                         })
                   })
                   .map(move |_| {
-                        println!(" ⛁ [WORKER] Sucessfully saved blendfile for job [{}]", id);
+                        if savepath2.is_file(){
+                            println!(" ⛁ [WORKER] Sucessfully saved blendfile for job [{}]", id);
+                        }   
                   })
                   .map_err(move |err| {
                         if format!("{}", err).contains("(os error 111)") {
@@ -89,6 +92,6 @@ impl Work {
                   })
         }));
             // If everything worked out, insert the id with the path to the file into the values
-            savepath2
+            savepath3
     }
 }
