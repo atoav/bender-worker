@@ -42,7 +42,7 @@ cuda = False
 if uses_cycles:
     prefs = bpy.context.user_preferences.addons['cycles'].preferences
     if len(prefs.devices) > 0:
-        history[now()] = "optimize_blend.py: Found these cycles devices: "+", ".join([str(x) for x in prefs.devices])
+        history[now()] = "optimize_blend.py: Found these cycles devices: "+", ".join([str(d).replace("<bpy_struct, CyclesDeviceSettings(\"", "").replace("\")>", "") for d in prefs.devices])
         try:
             bpy.context.user_preferences.addon['cycles'].preferences.compute_device_type = 'CUDA'
             cuda = True
