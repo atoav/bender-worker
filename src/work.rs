@@ -70,7 +70,7 @@ impl Work{
         }
 
         // Update the parent jobs statuses
-        if self.has_task() && !self.all_jobs_finished(){
+        if self.has_task() {
             self.update_parent_jobs();
         }
 

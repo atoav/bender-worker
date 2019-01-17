@@ -157,6 +157,7 @@ pub fn get_config<P>(p: P, args: &Args) -> GenResult<Config> where P: Into<PathB
             while let Err(e) = setup_outpath(&mut config, &d){
                 println!("ERROR: This is not a valid directory: {}", e);
             }
+
             // Write it to file
             config.to_file(p.to_string_lossy())?;
             Ok(config)
