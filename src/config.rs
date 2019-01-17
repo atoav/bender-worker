@@ -41,7 +41,7 @@ impl Config{
             blendpath: PathBuf::new(),        // Path to where the blendfiles should be stored
             outpath: PathBuf::new(),          // Path to where the rendered frames should be stored
             disklimit: 200*1_000_000,         // In MB
-            workload: 1,                      // How many frames to take at once
+            workload: 5,                      // How many frames to take at once
             grace_period: 60                  // How many seconds to keep blendfiles around before deletion
         }
     }

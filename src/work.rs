@@ -28,6 +28,7 @@ pub struct Work{
     pub current: Option<Task>,
     pub history: History,
     pub blendfiles: HashMap<String, Option<Blendfile>>,
+    pub parent_jobs: HashMap<String, String>,
     command: Option<std::process::Child>,
     display_divider: bool
 }
@@ -44,6 +45,7 @@ impl Work{
             current: None,
             history: History::new(),
             blendfiles: HashMap::<String, Option<Blendfile>>::new(),
+            parent_jobs: HashMap::<String, String>::new(),
             command: None,
             display_divider: true
         }
@@ -56,6 +58,8 @@ impl Work{
     }
 
 
+
+
     /// Runs every loop and updates everything. This is the meat of the business\
     /// logic for the worker.
     pub fn update(&mut self, channel: &mut Channel){
@@ -65,19 +69,26 @@ impl Work{
             self.get_tasks(channel);
         }
 
+        // Update the parent jobs statuses
+        if self.has_task() && !self.all_jobs_finished(){
+            self.update_parent_jobs();
+        }
+
         // Get the blendfile from the server only if there are 
         // tasks that actually need one
-        if self.has_task() && self.tasks.iter().any(|t| !t.is_ended()){
+        if self.has_task() || !self.tasks.iter().all(|t| t.is_ended()){
             self.get_blendfiles();
             self.add_paths_to_tasks();
         }
 
-        // Construct Commands for Tasks that have a matching blendfile on disk \
-        // and whoose commands are not constructed yet
-        self.construct_commands();
+        if self.has_task() && !self.all_jobs_finished() {
+            // Construct Commands for Tasks that have a matching blendfile on disk \
+            // and whoose commands are not constructed yet
+            self.construct_commands();
 
-        // Update who the current Task is ("self.current")
-        self.queue_next_task(channel);
+            // Update who the current Task is ("self.current")
+            self.select_next_task(channel);
+        }
 
         // Dispatch a Command for the current Task ("self.current")
         self.run_command(channel);
@@ -85,10 +96,12 @@ impl Work{
         // Figure out if a blendfile's tasks are all finished. If so request the\
         // job status from flaskbender. If the job has finished and a certain grace\
         // period has passed, delete the blendfile in question
-        self.cleanup_blendfiles();
+        if self.has_task() && !self.all_jobs_finished() && self.any_job_finished() {
+            self.cleanup_blendfiles();
+        }
 
         // Print a divider
-        if self.has_task(){
+        if self.has_task() && !self.all_jobs_finished() {
             self.print_divider();
         }
     }  
@@ -96,9 +109,15 @@ impl Work{
 
     /// Print a horizontal divider if the flag is set and reset the flag afterwards
     fn print_divider(&mut self) {
-        if self.display_divider {
+        if self.display_divider || !self.display_divider {
             println!("{}", "-".repeat(width()));
             self.display_divider = false;
+            let a = self.tasks.iter().count();
+            let f = self.tasks.iter().filter(|t| t.is_finished()).count();
+            let q = self.tasks.iter().filter(|t| t.is_queued()).count();
+            let w = self.tasks.iter().filter(|t| t.is_waiting()).count();
+            let r = self.current.is_some();
+            println!("All: {}    Finished: {}    Queued: {}     Waiting: {}    Current: {}", a,  f, q, w, r);
         }
     }
 }

@@ -22,6 +22,7 @@ extern crate bender_mq;
 extern crate docopt;
 extern crate colored;
 extern crate console;
+extern crate reqwest;
 
 use std::fs;
 use colored::*;
@@ -329,35 +330,7 @@ fn run(args: &Args) {
                         
 
                     loop{
-                        // -----------------------------------------------------
-                        // 1. Clean up old stuff if necessary
-
-
-                        // -----------------------------------------------------
-                        // 2. Read Commands from the work queue and construct Work
-                        //    with optimize_blend.py etc
                         work.update(&mut channel);
-
-
-                        // -----------------------------------------------------
-                        // 3. ACK all Commands that are done
-
-
-                        // -----------------------------------------------------
-                        // 4. Get files from Server or re-use stored ones
-
-
-                        // -----------------------------------------------------
-                        // 5. Execute Blender and Deal with the STDOUT
-
-
-                        // -----------------------------------------------------
-                        // 6. Upload stored Frames
-
-
-                        // -----------------------------------------------------
-                        // 7. Update Infos
-
 
                         // Debounced Message handling
                         let message = "".to_string();

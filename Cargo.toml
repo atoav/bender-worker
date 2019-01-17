@@ -20,6 +20,7 @@ serde_derive = "1"
 shlex = "0.1"
 toml = "0.4"
 uuid = { version = "0.7", features = ["serde", "v4"] }
+reqwest = "0.9"
 
 bender_job = { path = "../bender-job" }
 bender_mq = { path = "../bender-mq" }

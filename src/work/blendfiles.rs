@@ -23,6 +23,54 @@ use bender_job::{Status, Task};
 
 
 impl Work{
+
+    /// Update the parent Jobs status
+    pub fn update_parent_jobs(&mut self) {
+        // Clear the hashmap
+        self.parent_jobs.clear();
+        // Collect all unique parent ids into a Vec
+        let u: Vec<String> = self.unique_parent_ids()
+                                 .map(|id| id.to_string())
+                                 .collect();
+        // For each unique parent id request the current job status from flaskbender
+        u.iter()
+         .for_each(|id|{
+            match self.request_jobstatus(id.to_string()) {
+                Ok(status) => {
+                    // Status is a string that looks like this: {'Job': 'Queued'}
+                    let status = status.split("\'").collect::<Vec<&str>>();
+                    match status.get(3){
+                        Some(s) => {
+                            self.parent_jobs.insert(id.to_string(), s.to_string());
+                        },
+                        None => eprintln!("{}", format!(" ✖ [WORKER] Error: While requesting job status for [{}], malformed response", id.to_string()).red())
+                    }
+                },
+                Err(err) => eprintln!("{}", format!(" ✖ [WORKER] Error: While requesting job status for [{}]: {}", id.to_string(), err).red())
+            }
+         })
+    }
+
+    /// Check whether the given job id is queued
+    pub fn job_is_finished<S>(&self, id: S) -> bool where S: Into<String> {
+        let id = id.into();
+        match self.parent_jobs.get(&id){
+            Some(status) => {
+                status.clone().contains("Finished")
+            },
+            None => false
+        }
+    }
+
+    pub fn any_job_finished(&self) -> bool {
+        self.parent_jobs.iter().any(|(_id, status)|status.contains("Finished"))
+    }
+
+    pub fn all_jobs_finished(&self) -> bool {
+        self.parent_jobs.iter().all(|(_id, status)|status.contains("Finished"))
+    }
+
+
     /// Delete finished blendfiles that are done and overdue
     pub fn cleanup_blendfiles(&mut self) {
         // Collect all Blendfile IDs that have all their tasks finished.
@@ -47,8 +95,13 @@ impl Work{
                         .map(|(id, _)| id.clone())
                         .collect();
 
-        // TODO: Implement request for Job status here
-        let shall_finish = potentially_finished;
+        // Check if 
+        let shall_finish: Vec<String> = potentially_finished.iter()
+                                               .cloned()
+                                               .filter(|id|{
+                                                    self.job_is_finished(id.as_str())
+                                               })
+                                               .collect();
 
         // Remove tasks that are contained in finished blendfiles
         self.tasks.retain(|ref task| shall_finish.contains(&task.parent_id));
@@ -277,7 +330,7 @@ impl Blendfile{
     /// Returns true if the last access has happened a longer time ago than the \
     /// supplied grace period. Note that the grace_duration is a std::time::Duration
     pub fn is_over_grace_period(&self, grace_duration: std::time::Duration) -> bool{
-        println!("Duration since last access: {}", format_duration(self.since_last_access()));
+        // println!("Duration since last access: {}", format_duration(self.since_last_access()));
         self.since_last_access().to_std().unwrap() > grace_duration
     }
 }

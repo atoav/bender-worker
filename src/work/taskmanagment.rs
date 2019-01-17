@@ -15,19 +15,27 @@ impl Work{
     /// 1. the workload that self has set in the config
     /// 2. whether there is enough space left
     pub fn should_add(&self) -> bool{
-        let okay_space = system::enough_space(&self.config.outpath, self.config.disklimit);
-        if okay_space{
+        // Return early if ther isn't enough space
+        if system::enough_space(&self.config.outpath, self.config.disklimit){
             eprintln!("{}", format!(" ❗ [WORKER] Warning: Taking no new jobs").black().on_yellow());
             system::print_space_warning(&self.config.outpath, self.config.disklimit);
             let timeout = Duration::from_secs(5);
             sleep(timeout);
+            false
+        }else{
+            // Do not add new tasks if we have reached the workload defined in Tasks
+            let active_task_count = self.tasks.iter()
+                                         .filter(|t| !t.is_ended())
+                                         .count();
+            if active_task_count >= self.config.workload {
+                false
+            }else{
+                true
+            }
         }
-        self.tasks.iter()
-                  .filter(|t| t.is_waiting() || t.is_queued())
-                  .count() < self.config.workload
-                      &&
-                  !okay_space
-                  
+
+        // let self.unique_parent_ids()
+        // && self.job_is_finished(t.parent_id)
     }
 
     /// Listen in to work queue and get n messages (defined by the workload setting)
@@ -38,20 +46,25 @@ impl Work{
         let mut remaining_delivery_tags = Vec::<u64>::new();
 
         // Get the next task from the work queue
-        channel.basic_get("work", true)
+        channel.basic_get("work", false)
                .take(1)
                .for_each(|message|{
                     match Task::deserialize_from_u8(&message.body){
                         Ok(mut t) => {
-                            println!(" ✚ [WORKER] Received Task [{id}]", id=t.id);
                             
                             // Add Delivery tag to task data for later acknowledgement
                             t.add_data("task-delivery-tag", message.reply.delivery_tag.to_string().as_str());
                             
                             // Add this as a event to the tasks history
-                            let h = format!("Task arrived at Worker [{}] with delivery tag {}", self.config.id, t.data.get("task-delivery-tag").unwrap());
+                            let h = format!("[WORKER] Task arrived at Worker [{}] with delivery tag {}", self.config.id, t.data.get("task-delivery-tag").unwrap());
                             self.add_history(h.as_str());
                             
+                            // Set the status of the task to queued
+                            t.queue();
+
+                            println!(" ✚ [WORKER] Received Task [{id}] ({len})", 
+                                id=t.id,
+                                len=self.tasks.len());
                             // Add the newly modified Task to the queue
                             self.tasks.push(t);
                         },
@@ -91,7 +104,7 @@ impl Work{
     /// Only works on tasks with a constructed Command
     /// Doesn't affect the Tasks Status (use it too peek for next Task)
     pub fn next_task(&self) -> Option<&Task>{
-        if !self.tasks.iter().any(|t| t.is_running()) {
+        if self.current.is_none() {
             self.tasks.iter()
                       .filter(|t| t.command.is_constructed())
                       .find(|t| t.is_queued())
@@ -103,9 +116,9 @@ impl Work{
     /// Moves the next Task to self.current only if there is no Task running
     /// Only works on tasks with a constructed Command
     /// Sets the Tasks Status to Running
-    pub fn queue_next_task(&mut self, channel: &mut Channel){
-        // Only do this if there is no task running
-        if !self.tasks.iter().any(|t| t.is_running()) && self.current.is_none() {
+    pub fn select_next_task(&mut self, channel: &mut Channel){
+        // Only do this if there is no current task running
+        if self.current.is_none() && self.tasks.len() > 0{
             let mut i = 0;
             let mut next = None;
             // Find the first task that:
@@ -113,14 +126,22 @@ impl Work{
             // - has a constructed command
             // - is queued
             // then remove this Task from the list and tore it in next
-            while i != self.tasks.len() {
+            while i < self.tasks.len() {
                 if self.has_blendfile(&self.tasks[i]) &&
-                   self.tasks[i].command.is_constructed() &&
-                   self.tasks[i].is_queued() &&
-                   next.is_none() {
-                       next = Some(self.tasks.remove(i));
+                    self.tasks[i].command.is_constructed() &&
+                    self.tasks[i].is_queued() &&
+                    next.is_none() {
+                        // println!("SELECTED TASK [{}]", &self.tasks[i].id);
+                        next = Some(self.tasks.remove(i));
                 } else {
-                       i += 1;
+                        i += 1;
+                        if i < self.tasks.len() {
+                            // println!("SELECTION for {}", &self.tasks[i].id);
+                            // println!("              has_blendfile:  {}", self.has_blendfile(&self.tasks[i]));
+                            // println!("              is_constructed: {}", self.tasks[i].command.is_constructed());
+                            // println!("              is_queued:      {}", self.tasks[i].is_queued());
+                            // println!("              next.is_none:   {}\n", next.is_none());
+                        }
                 }
             }
 
@@ -155,17 +176,17 @@ impl Work{
             self.tasks.push(t.clone());
 
             // Ack the finished Task!
-            // let deliver_tag = t.data.get("task-delivery-tag")
-            //                         .clone()
-            //                         .unwrap()
-            //                         .parse::<u64>()
-            //                         .unwrap();
-            // if let Err(err) = channel.basic_ack(deliver_tag, false){
-            //     eprintln!(" ✖ [WORKER] Error: Couldn't acknowledge task {} for job [{}]: {}", 
-            //         t.command.short(), 
-            //         t.parent_id,
-            //         err);
-            // }
+            let deliver_tag = t.data.get("task-delivery-tag")
+                                    .clone()
+                                    .unwrap()
+                                    .parse::<u64>()
+                                    .unwrap();
+            if let Err(err) = channel.basic_ack(deliver_tag, false){
+                eprintln!(" ✖ [WORKER] Error: Couldn't acknowledge task {} for job [{}]: {}", 
+                    t.command.short(), 
+                    t.parent_id,
+                    err);
+            }
 
             // Post the updated Task Info
             let routing_key = format!("worker.{}", self.config.id);

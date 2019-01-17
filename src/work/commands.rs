@@ -74,6 +74,7 @@ impl Work{
                                 Ok(c) => {
                                     println!(" ⚟ [WORKER] Dispatched Command: \"blender {}\"", args.join(" "));
                                     self.command = Some(c);
+                                    
                                     ExitStatus::Running
                                 },
                                 Err(err) => ExitStatus::Errored(
@@ -148,14 +149,14 @@ pub fn process_stdout(child:&mut std::process::Child){
                   .filter_map(|line| line.ok())
                   .filter(|line| line.trim() != "")
                   .for_each(|line| {
-                    let message = format!("   [WORKER][COMMAND] {}", line).dimmed();
+                    let _message = format!("   [WORKER][COMMAND] {}", line).dimmed();
                     
                     // let term = Term::stdout();
                     // let w = term.size().1 as usize;
                     // let lines = measure_text_width(&message.to_string()) / w;
                     // let _ = term.clear_last_lines(lines+1);
                     
-                    println!("{}", message);
+                    // println!("{}", message);
                   });
         },
         None => eprintln!("{}", format!(" ✖ [WORKER] Error: Couldn't get a stdout").red())

@@ -9,10 +9,16 @@ use std::fs::File;
 use hyper::{Client, Body};
 use hyper::http::Request;
 use hyper::rt::{self, Future, Stream};
+use reqwest::header::USER_AGENT;
+
+
+pub type GenError = Box<std::error::Error>;
+pub type GenResult<T> = Result<T, GenError>;
+
+
 
 
 impl Work {
-    
 
     /// Request a single blendfile for a given Job-ID from flaskbender via http \
     /// get request. Uses the User-Agent http header in combination with a json \
@@ -31,7 +37,7 @@ impl Work {
         rt::run(rt::lazy(move || {
             let client = Client::new();
             // Make a request to the URL
-            let url = format!("{url}/job/{id}", url=url, id=id);
+            let url = format!("{url}/job/worker/blend/{id}", url=url, id=id);
             let mut request = Request::builder();
             request.uri(url)
                    .header("content-type", "application/json")
@@ -94,4 +100,28 @@ impl Work {
             // If everything worked out, insert the id with the path to the file into the values
             savepath3
     }
+
+
+
+
+    pub fn request_jobstatus<S>(&self, id: S) -> GenResult<String> where S: Into<String>{
+        let id = id.into();
+        // Make a request to the URL
+        let url = format!("{url}/job/worker/status/{id}", 
+            url=self.config.bender_url.clone(), 
+            id=id.clone());
+
+        let client = reqwest::Client::new();
+        let res = client.get(url.as_str())
+            .header(USER_AGENT, "bender-worker")
+            .send()?
+            .text()?;
+        // println!(" ⛁ [WORKER] Requested status of job [{}] is {}", id.clone(), res);
+        Ok(res)
+    }
+
+
+
+
+    
 }
