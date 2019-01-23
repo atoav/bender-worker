@@ -118,7 +118,7 @@ impl Work{
     /// Sets the Tasks Status to Running
     pub fn select_next_task(&mut self, channel: &mut Channel){
         // Only do this if there is no current task running
-        if self.current.is_none() && self.tasks.len() > 0{
+        if self.current.is_none() && self.has_task() {
             let mut i = 0;
             let mut next = None;
             // Find the first task that:
@@ -129,7 +129,7 @@ impl Work{
             while i < self.tasks.len() {
                 if self.has_blendfile(&self.tasks[i]) &&
                     self.tasks[i].command.is_constructed() &&
-                    self.tasks[i].is_queued() &&
+                    (self.tasks[i].is_queued() || self.tasks[i].is_running()) &&
                     next.is_none() {
                         // println!("SELECTED TASK [{}]", &self.tasks[i].id);
                         next = Some(self.tasks.remove(i));

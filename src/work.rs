@@ -100,8 +100,8 @@ impl Work{
             self.cleanup_blendfiles();
         }
 
-        // Print a divider
-        if self.has_task() && !self.all_jobs_finished() {
+        // Print a divider in debug mode
+        if cfg!(debug_assertions) && self.has_task() && !self.all_jobs_finished() {
             self.print_divider();
         }
     }  
@@ -117,7 +117,9 @@ impl Work{
             let q = self.tasks.iter().filter(|t| t.is_queued()).count();
             let w = self.tasks.iter().filter(|t| t.is_waiting()).count();
             let r = self.current.is_some();
-            println!("All: {}    Finished: {}    Queued: {}     Waiting: {}    Current: {}", a,  f, q, w, r);
+            if cfg!(debug_assertions) {
+                eprintln!("All: {}    Finished: {}    Queued: {}     Waiting: {}    Current: {}", a,  f, q, w, r);
+            }
         }
     }
 }
