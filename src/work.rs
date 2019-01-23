@@ -71,7 +71,7 @@ impl Work{
 
         // Update the parent jobs statuses
         if self.has_task() {
-            self.update_parent_jobs();
+            self.update_parent_jobs_stati();
         }
 
         // Get the blendfile from the server only if there are 

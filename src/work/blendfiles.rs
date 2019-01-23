@@ -25,7 +25,7 @@ use bender_job::{Status, Task};
 impl Work{
 
     /// Update the parent Jobs status
-    pub fn update_parent_jobs(&mut self) {
+    pub fn update_parent_jobs_stati(&mut self) {
         // Clear the hashmap
         self.parent_jobs.clear();
         // Collect all unique parent ids into a Vec
