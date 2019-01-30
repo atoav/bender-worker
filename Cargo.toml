@@ -1,6 +1,6 @@
 [package]
 name = "bender-worker"
-version = "0.1.0"
+version = "0.1.1"
 license = "MIT"
 readme = "README.md"
 authors = ["David Huss <dh@widerstandzwecklos.at>"]
@@ -11,8 +11,8 @@ workspace = ".."
 extended-description = "As part of the bender renderfarm, the bender-worker service acts as a client that receives tasks from the qu which are executed. It downloads and stores the needed blendfile from flaskbender and stores the file after rendering"
 depends = "$auto, blender"
 assets = [
-    ["target/release/bender-worker", "usr/local/bin/", "755"],
-    ["bender-worker.service", "etc/systemd/system/", "755"]
+    ["target/release/bender-worker", "usr/bin/", "755"],
+    ["bender-worker.service", "lib/systemd/system/", "755"]
 ]
 
 [dependencies]
