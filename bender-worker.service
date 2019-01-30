@@ -3,7 +3,7 @@ Description=bender-worker
 
 [Service]
 Type=simple
-ExecStart=/usr/local/bin/bender-worker
+ExecStart=/usr/bin/bender-worker
 
 [Install]
 WantedBy=multi-user.target
