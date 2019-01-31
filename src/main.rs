@@ -28,8 +28,8 @@ extern crate itertools;
 extern crate dialoguer;
 extern crate shlex;
 extern crate toml;
-extern crate bender-job;
-extern crate bender-mq;
+extern crate bender_job;
+extern crate bender_mq;
 extern crate docopt;
 extern crate colored;
 extern crate console;
@@ -47,7 +47,7 @@ use docopt::Docopt;
 use serde_derive::{Serialize, Deserialize};
 use dialoguer::Confirmation;
 use console::Term;
-use bender-mq::{Channel, BenderMQ};
+use bender_mq::{Channel, BenderMQ};
 
 
 pub mod system;
