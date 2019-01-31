@@ -23,7 +23,7 @@ pub mod taskmanagment;
 /// history and a Hashmap with blendfiles.
 #[derive(Debug)]
 pub struct Work{
-    pub config: Config,
+    pub config: WorkerConfig,
     pub tasks: Vec<Task>,
     pub current: Option<Task>,
     pub history: History,
@@ -38,7 +38,7 @@ pub struct Work{
 
 impl Work{
     /// Create a new task with a given config
-    pub fn new(config: Config) -> Self{
+    pub fn new(config: WorkerConfig) -> Self{
         Work{
             config: config,
             tasks: Vec::<Task>::new(),

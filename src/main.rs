@@ -35,7 +35,6 @@ extern crate colored;
 extern crate console;
 extern crate reqwest;
 
-extern crate
 
 use std::fs;
 use colored::*;
@@ -332,7 +331,7 @@ fn run(args: &Args) {
                     // TODO APPSAVEPATH REINSPEICHERN
 
                     // Print the space left on the Worker Machine (at the path of the Application Data)
-                    system::print_space_warning(Path::new(&app_savepath), config.disklimit);
+                    system::print_space_warning(&config.outpath, config.disklimit);
                     println!();
 
                     // Create a empty message buffer for debouncing
