@@ -9,7 +9,7 @@ workspace = ".."
 
 [package.metadata.deb]
 extended-description = "As part of the bender renderfarm, the bender-worker service acts as a client that receives tasks from the qu which are executed. It downloads and stores the needed blendfile from flaskbender and stores the file after rendering"
-depends = "$auto, blender"
+depends = "$auto, blender, bender-config"
 assets = [
     ["target/release/bender-worker", "usr/bin/", "755"],
     ["bender-worker.service", "lib/systemd/system/", "755"]
@@ -35,3 +35,4 @@ reqwest = "0.9"
 
 bender_job = { git = "ssh://git@code.hfbk.net:4242/bendercode/bender-job.git" }
 bender_mq  = { git = "ssh://git@code.hfbk.net:4242/bendercode/bender-mq.git" }
+bender_config = { git = "ssh://git@code.hfbk.net:4242/bendercode/bender-config.git" }

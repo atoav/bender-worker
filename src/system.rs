@@ -3,8 +3,13 @@ use ::*;
 
 
 pub fn blender_in_path() -> bool{
-    match process::Command::new("blender").arg("--version").status() {
-        Ok(_) => true,
+    match process::Command::new("blender").arg("--version").output() {
+        Ok(s) => {
+            let blender_version = String::from_utf8_lossy(&s.stdout).to_string();
+            scrnmsg(format!("Using Blender version: {}", blender_version.trim()));
+            scrnmsg(" ".to_string());
+            true
+        },
         Err(e) => {
             if let std::io::ErrorKind::NotFound = e.kind() {
                 eprintln!(" ✖ [WORKER] Blender is not installed or not in PATH environment variable: {}", e);
@@ -45,9 +50,9 @@ pub fn print_space_warning<P>(p: P, limit: u64) where P: Into<PathBuf>{
         Ok(space) => {
             let gigabytes = space as f64/1_000_000_000.0;
             if  space < limit{
-                println!("❗ Warning: Space left on disk:        {:.*} GB", 4, gigabytes.to_string());
+                redmsg(format!("❗ Warning: Space left on disk:        {:.*} GB", 4, gigabytes.to_string()));
             }else{
-                println!("Space left on disk:                 {:.*} GB", 4, gigabytes.to_string());
+                scrnmsg(format!("Space left on disk:                 {:.*} GB", 4, gigabytes.to_string()));
             }
         },
         Err(err) => {

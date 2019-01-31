@@ -28,12 +28,14 @@ extern crate itertools;
 extern crate dialoguer;
 extern crate shlex;
 extern crate toml;
-extern crate bender_job;
-extern crate bender_mq;
 extern crate docopt;
 extern crate colored;
 extern crate console;
 extern crate reqwest;
+
+extern crate bender_job;
+extern crate bender_mq;
+extern crate bender_config;
 
 
 use std::fs;
@@ -46,6 +48,7 @@ use docopt::Docopt;
 use serde_derive::{Serialize, Deserialize};
 use dialoguer::Confirmation;
 use console::Term;
+
 use bender_mq::{Channel, BenderMQ};
 
 
@@ -275,20 +278,18 @@ fn width() -> usize{
 
 fn run(args: &Args) {
     // Get a valid application save path depending on the OS
-    println!("\n{x} BENDER-WORKER {x}", x="=".repeat((width()-15)/2));
+    scrnmsg(format!("\n{x} BENDER-WORKER {x}", x="=".repeat((width()-15)/2)));
     match get_app_root(AppDataType::UserConfig, &APP_INFO){
-        Err(err) => eprintln!("{}", format!(" ✖ Error: Couldn't get application folder: {}", err).red()),
+        Err(err) => errmsg(format!("Couldn't get application folder: {}", err)),
         Ok(app_savepath) => {
-            println!("Storing Application Data in:        {}", app_savepath.to_string_lossy().replace("\"", "").bold());
-
             // Load the configuration (or generate one if we are a first timer)
             match config::get_config(&app_savepath, &args){
                 Err(err) => {
                     let e = format!("{}", err);
                     if !e.contains("missing field"){
-                        eprintln!("{}", format!(" ✖ Error: Couldn't generate/read config file: {}", err).red());
+                        errmsg(format!("Couldn't generate/read config file: {}", err));
                     }else{
-                        eprintln!("{}", format!(" ✖ Error: The existing configuration misses a field: {}", err).red());
+                        errmsg(format!("The existing configuration misses a field: {}", err));
                         let msg = "Do you want to generate a new one? (this overrides the existing configuration)".on_red();
                         if Confirmation::new().with_text(&msg).interact().unwrap(){
                             let mut p = PathBuf::from(&app_savepath);
@@ -301,25 +302,25 @@ fn run(args: &Args) {
                 },
                 Ok(config) => {
                     if !system::blender_in_path(){
-                        eprintln!("{}", format!(" ✖ Error: Found no 'blender' command in the PATH. Make sure it is installed and in PATH environment variable").on_red());
+                        errmsg(format!("Found no 'blender' command in the PATH. Make sure it is installed and in PATH environment variable"));
                         process::exit(1);
                     }
 
                     if !config.outpath.exists(){
                         let mut configpath = app_savepath.clone();
                     configpath.push("config.toml");
-                        eprintln!("{}", format!(" ✖ Error: the path specified as output path in {} does not exist or is not writeable!", configpath.to_string_lossy()).on_red());
+                        errmsg(format!("the path specified as output path in {} does not exist or is not writeable!", configpath.to_string_lossy()));
                         println!("Please either create the path at {} or modify the config with bender-worker --configure", 
                             config.outpath.to_string_lossy() );
                         process::exit(1);
                     }
                     // We sucessfullt created a config file, let's go ahead
-                    println!("This Worker has the ID:             [{}]", config.id);
+                    scrnmsg(format!("This Worker has the ID:             [{}]", config.id));
 
                     // For now. TODO: discover this on the bender.hfbk.net
                     let url = "amqp://localhost//".to_string();
-                    println!("Listening on for AMQP traffic at:   {}", url);
-                    println!("Storing jobs at:                    {}", config.blendpath.to_string_lossy());
+                    scrnmsg(format!("Listening on for AMQP traffic at:   {}", url));
+                    scrnmsg(format!("Storing jobs at:                    {}", config.blendpath.to_string_lossy()));
                     let mut channel = Channel::open_default_channel().expect(&format!("{}", format!(" ✖ [WORKER] Error: Couldn't aquire channel").red()));
 
                     // Declare a Work exchange
@@ -332,7 +333,6 @@ fn run(args: &Args) {
 
                     // Print the space left on the Worker Machine (at the path of the Application Data)
                     system::print_space_warning(&config.outpath, config.disklimit);
-                    println!();
 
                     // Create a empty message buffer for debouncing
                     // let mut info_messages = MessageBuffer::new();
@@ -342,6 +342,8 @@ fn run(args: &Args) {
                     let mut pmessage = "".to_string();
 
                     let mut work = Work::new(config.clone());
+
+                    scrnmsg(format!("{}", "v".repeat(width())));
                         
 
                     loop{
@@ -360,4 +362,58 @@ fn run(args: &Args) {
         }
         
     }
+}
+
+
+/// A fancy error message
+pub fn errmsg<S>(s: S) where S: Into<String>{
+    let s = s.into();
+    let label = " Error ".on_red().bold();
+    eprintln!("    {} {}", label, s);
+}
+
+/// A fancy ok message
+pub fn okmsg<S>(s: S) where S: Into<String>{
+    let s = s.into();
+    let label = "  OK  ".on_green().bold();
+    println!("    {} {}", label, s)
+}
+
+/// A fancy note message
+pub fn notemsg<S>(s: S) where S: Into<String>{
+    let s = s.into();
+    let label = "  NOTE  ".on_yellow().bold();
+    println!("    {} {}", label, s)
+}
+
+pub fn errrun<S>(s: S) where S: Into<String>{
+    let s = s.into();
+    let label = " ✖ Error: ".red();
+    eprintln!("{}{}", label, s);
+}
+
+pub fn scrnmsg<S>(s: S) where S: Into<String>{
+    let s = s.into();
+    let subs = s.as_bytes()
+                .chunks(width())
+                .map(std::str::from_utf8)
+                .filter(|l| l.is_ok())
+                .map(|l| l.unwrap())
+                .map(|line| format!("{}{}", line, " ".repeat(width()-line.len())))
+                .collect::<Vec<String>>()
+                .join("\n");
+    println!("{}", subs.black().on_white());
+}
+
+pub fn redmsg<S>(s: S) where S: Into<String>{
+    let s = s.into();
+    let subs = s.as_bytes()
+                .chunks(width())
+                .map(std::str::from_utf8)
+                .filter(|l| l.is_ok())
+                .map(|l| l.unwrap())
+                .map(|line| format!("{}{}", line, " ".repeat(width()-line.len())))
+                .collect::<Vec<String>>()
+                .join("\n");
+    println!("{}", subs.black().on_red());
 }

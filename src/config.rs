@@ -7,8 +7,13 @@ use std::error::Error;
 use std::fs;
 use std::io::Read;
 use dialoguer::Input;
+use std::process::Command;
 
-
+// Default parameters
+const BENDER_URL: &'static str = "http://0.0.0.0:5000";
+const DISKLIMIT: u64 =           200*1_000_000;
+const WORKLOAD: usize =          1;
+const GRACE_PERIOD: u64 =        60;
 
 
 pub type GenError = Box<std::error::Error>;
@@ -24,7 +29,8 @@ pub struct WorkerConfig{
     pub outpath: PathBuf,
     pub disklimit: u64,
     pub workload: usize,
-    pub grace_period: u64
+    pub grace_period: u64,
+    pub mode: Mode
 }
 
 
@@ -34,15 +40,15 @@ impl WorkerConfig{
     /// Create a new configuration with default values
     pub fn new() -> Self{
         // Default for now.
-        let bender_url = "http://0.0.0.0:5000".to_string();
         Self{
-            bender_url: bender_url,           // URL of the bender frontend
-            id: Uuid::new_v4(),               // Random UUID on start, then from disk
-            blendpath: PathBuf::new(),        // Path to where the blendfiles should be stored
-            outpath: PathBuf::new(),          // Path to where the rendered frames should be stored
-            disklimit: 200*1_000_000,         // In MB
-            workload: 1,                      // How many frames to take at once
-            grace_period: 60                  // How many seconds to keep blendfiles around before deletion
+            bender_url:     BENDER_URL.to_string(),  // URL of the bender frontend
+            id:             Uuid::new_v4(),          // Random UUID on start, then from disk
+            blendpath:      PathBuf::new(),          // Path to where the blendfiles should be stored
+            outpath:        PathBuf::new(),          // Path to where the rendered frames should be stored
+            disklimit:      DISKLIMIT,               // In MB
+            workload:       WORKLOAD,                // How many frames to take at once
+            grace_period:   GRACE_PERIOD,            // How many seconds to keep blendfiles around before deletion
+            mode:           Mode::Independent        // use server config or not
         }
     }
 
@@ -58,7 +64,7 @@ impl WorkerConfig{
         Ok(deserialized)
     }
 
-    /// Write a given WorkerConfig to the file at path P
+    /// Write a given WorkerConfig to the file at path
     pub fn to_file<P>(&self, p: P) -> GenResult<()> where P: Into<String> {
         let p = p.into();
         // Step 1: Serialize
@@ -77,6 +83,28 @@ impl WorkerConfig{
         let config = Self::deserialize(contents)?;
         Ok(config)
     }
+
+    /// Extract the relevant parts of a `bender_config::Config` and return a \
+    /// WorkerConfig. Fill all missing fields with the default values
+    pub fn from_serverconfig(config: bender_config::Config) -> Self{
+        Self{
+            bender_url:    BENDER_URL.to_string(),
+            id:            config.worker.id,
+            disklimit:     config.worker.disklimit,
+            grace_period:  config.worker.grace_period,
+            workload:      config.worker.workload,
+            blendpath:     PathBuf::from(config.paths.blend()),
+            outpath:       PathBuf::from(config.paths.frames()),
+            mode:          Mode::Server
+        }
+    }
+}
+
+/// Defines the mode the application is running in
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub enum Mode{
+    Server,
+    Independent
 }
 
 
@@ -126,15 +154,53 @@ pub fn setup_outpath<P>(config: &mut WorkerConfig, p: P) -> GenResult<()> where 
 
 
 
+/// Figure out if there is a config for the server via command `bender-config path`
+/// and return a working config, either in server mode or in independent mode
+pub fn get_config<P>(p: P, args: &Args) -> GenResult<WorkerConfig> where P: Into<PathBuf>{
+    let p = p.into();
+
+    // Check if we have a bender-config (this indicates we are on a server)
+    let configpath: Option<String> = match Command::new("bender-config")
+                                        .arg("path")
+                                        .output(){
+        Ok(out)     =>  Some(String::from_utf8_lossy(&out.stdout).to_string()),
+        Err(_err)   =>  None
+    };
+
+    // Try to get a serverconfig if there is one, otherwise get the worker config \
+    // or generate a new one
+    match configpath {
+        Some(path) => {
+            match bender_config::Config::from_file(path.as_str()){
+                Ok(config) => {
+                    scrnmsg(format!("Running in Server Mode. Using the config at {}", path.trim()));
+                    Ok(WorkerConfig::from_serverconfig(config))
+                },
+                Err(err)   => {
+                    errmsg(format!("Failed to read bender's config.toml from {}: {}", path.trim().bold(), err));
+                    notemsg(format!("Attempting to use Workers own config at {} as a fallback", p.to_string_lossy().bold()));
+                    let c = get_worker_config(p, args)?;
+                    Ok(c)
+                }
+            }
+        },
+        None       => {
+            scrnmsg(format!("Running in Independent Mode. Using the config at {}", p.to_string_lossy()));
+            let c = get_worker_config(p, args)?;
+            Ok(c)
+        }
+    }
+}
+
 /// Try to read the WorkerConfig from the config folder or generate one if it doesn't\
 /// exist and write it to disk
-pub fn get_config<P>(p: P, args: &Args) -> GenResult<WorkerConfig> where P: Into<PathBuf>{
+pub fn get_worker_config<P>(p: P, args: &Args) -> GenResult<WorkerConfig> where P: Into<PathBuf>{
     let mut p = p.into();
     let d = p.clone();
     p.push("config.toml");
     match Path::new(&p).exists() && !args.flag_configure{
         true => {
-            println!("Reading the Configuration from:     {}", p.to_string_lossy());
+            okmsg(format!("Reading the Configuration from:     {}", p.to_string_lossy().bold()));
             // Deserialize it from file
             let config = WorkerConfig::from_file(&p)?;
             Ok(config)
@@ -142,8 +208,8 @@ pub fn get_config<P>(p: P, args: &Args) -> GenResult<WorkerConfig> where P: Into
         false => {
             // No WorkerConfig on disk. Create a new one and attempt to write it there
             if !args.flag_configure{
-                println!("No Configuration found at \"{}\"", p.to_string_lossy());
-                println!("Generating a new one");
+                notemsg(format!("No Configuration found at \"{}\"", p.to_string_lossy()));
+                notemsg(format!("Generating a new one"));
             }
             // Create directories on the way
             fs::create_dir_all(&d)?;
@@ -151,11 +217,11 @@ pub fn get_config<P>(p: P, args: &Args) -> GenResult<WorkerConfig> where P: Into
             let mut config = WorkerConfig::new();
             // Ask the user where to save blendfilesfiles
             while let Err(e) = setup_blendpath(&mut config, &d){
-                println!("ERROR: This is not a valid directory: {}", e);
+                errmsg(format!("This is not a valid directory: {}", e));
             }
             // Ask the user where to save the rendered Frames
             while let Err(e) = setup_outpath(&mut config, &d){
-                println!("ERROR: This is not a valid directory: {}", e);
+                errmsg(format!("This is not a valid directory: {}", e));
             }
 
             // Write it to file
@@ -164,3 +230,5 @@ pub fn get_config<P>(p: P, args: &Args) -> GenResult<WorkerConfig> where P: Into
         }
     }
 }
+
+
