@@ -17,7 +17,7 @@ pub type GenResult<T> = Result<T, GenError>;
 
 /// Holds the bender-worker's Configuration
 #[derive(Serialize, Deserialize, Debug, Clone)]
-pub struct Config{
+pub struct WorkerConfig{
     pub bender_url: String,
     pub id: Uuid,
     pub blendpath: PathBuf,
@@ -30,12 +30,12 @@ pub struct Config{
 
 
 
-impl Config{
+impl WorkerConfig{
     /// Create a new configuration with default values
     pub fn new() -> Self{
         // Default for now.
         let bender_url = "http://0.0.0.0:5000".to_string();
-        Config{
+        Self{
             bender_url: bender_url,           // URL of the bender frontend
             id: Uuid::new_v4(),               // Random UUID on start, then from disk
             blendpath: PathBuf::new(),        // Path to where the blendfiles should be stored
@@ -54,11 +54,11 @@ impl Config{
 
     /// Serialize the Configuration from TOML
     pub fn deserialize<S>(s: S) -> GenResult<Self> where S: Into<String> {
-        let deserialized: Config = toml::from_str(&s.into()[..])?;
+        let deserialized: WorkerConfig = toml::from_str(&s.into()[..])?;
         Ok(deserialized)
     }
 
-    /// Write a given Config to the file at path P
+    /// Write a given WorkerConfig to the file at path P
     pub fn to_file<P>(&self, p: P) -> GenResult<()> where P: Into<String> {
         let p = p.into();
         // Step 1: Serialize
@@ -68,7 +68,7 @@ impl Config{
         Ok(())
     }
 
-    /// Create a new Config from the given toml file
+    /// Create a new WorkerConfig from the given toml file
     pub fn from_file<S>(p: S) -> GenResult<Self> where S: Into<PathBuf>{
         let p = p.into();
         let mut file = fs::File::open(&p)?;
@@ -83,7 +83,7 @@ impl Config{
 
 
 /// Run the interactive setup dialog for the blendpath
-pub fn setup_blendpath<P>(config: &mut Config, p: P) -> GenResult<()> where P: Into<PathBuf>{
+pub fn setup_blendpath<P>(config: &mut WorkerConfig, p: P) -> GenResult<()> where P: Into<PathBuf>{
     // Create the default path
     let mut p = p.into();
             p.push("blendfiles");
@@ -105,7 +105,7 @@ pub fn setup_blendpath<P>(config: &mut Config, p: P) -> GenResult<()> where P: I
 
 
 /// Run the interactive setup dialog for the outpath, where the Frames should be saved
-pub fn setup_outpath<P>(config: &mut Config, p: P) -> GenResult<()> where P: Into<PathBuf>{
+pub fn setup_outpath<P>(config: &mut WorkerConfig, p: P) -> GenResult<()> where P: Into<PathBuf>{
     // Create the default path
     let mut p = p.into();
             p.push("frames");
@@ -126,9 +126,9 @@ pub fn setup_outpath<P>(config: &mut Config, p: P) -> GenResult<()> where P: Int
 
 
 
-/// Try to read the Config from the config folder or generate one if it doesn't\
+/// Try to read the WorkerConfig from the config folder or generate one if it doesn't\
 /// exist and write it to disk
-pub fn get_config<P>(p: P, args: &Args) -> GenResult<Config> where P: Into<PathBuf>{
+pub fn get_config<P>(p: P, args: &Args) -> GenResult<WorkerConfig> where P: Into<PathBuf>{
     let mut p = p.into();
     let d = p.clone();
     p.push("config.toml");
@@ -136,11 +136,11 @@ pub fn get_config<P>(p: P, args: &Args) -> GenResult<Config> where P: Into<PathB
         true => {
             println!("Reading the Configuration from:     {}", p.to_string_lossy());
             // Deserialize it from file
-            let config = Config::from_file(&p)?;
+            let config = WorkerConfig::from_file(&p)?;
             Ok(config)
         },
         false => {
-            // No Config on disk. Create a new one and attempt to write it there
+            // No WorkerConfig on disk. Create a new one and attempt to write it there
             if !args.flag_configure{
                 println!("No Configuration found at \"{}\"", p.to_string_lossy());
                 println!("Generating a new one");
@@ -148,7 +148,7 @@ pub fn get_config<P>(p: P, args: &Args) -> GenResult<Config> where P: Into<PathB
             // Create directories on the way
             fs::create_dir_all(&d)?;
             // Get a new config
-            let mut config = Config::new();
+            let mut config = WorkerConfig::new();
             // Ask the user where to save blendfilesfiles
             while let Err(e) = setup_blendpath(&mut config, &d){
                 println!("ERROR: This is not a valid directory: {}", e);

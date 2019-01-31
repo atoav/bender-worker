@@ -28,12 +28,14 @@ extern crate itertools;
 extern crate dialoguer;
 extern crate shlex;
 extern crate toml;
-extern crate bender_job;
-extern crate bender_mq;
+extern crate bender-job;
+extern crate bender-mq;
 extern crate docopt;
 extern crate colored;
 extern crate console;
 extern crate reqwest;
+
+extern crate
 
 use std::fs;
 use colored::*;
@@ -45,13 +47,13 @@ use docopt::Docopt;
 use serde_derive::{Serialize, Deserialize};
 use dialoguer::Confirmation;
 use console::Term;
-use bender_mq::{Channel, BenderMQ};
+use bender-mq::{Channel, BenderMQ};
 
 
 pub mod system;
 
 pub mod config;
-use config::Config;
+use config::WorkerConfig;
 
 pub mod work;
 use work::*;
@@ -67,7 +69,8 @@ via http GET, renders the Tasks and stores the rendered Frames on disk.
 
 Usage:
   bender-worker
-  bender-worker --configure
+  bender-worker --configure [--local]
+  bender-worker --local
   bender-worker clean [--force]
   bender-worker clean blendfiles [--force]
   bender-worker clean frames [--force]
@@ -82,12 +85,15 @@ Usage:
 Options:
   --force, -f   Don't ask for confirmation, just do it
   --configure   Run configuration
+  --local, -l   Run local
   -h --help     Show this screen.
   --version     Show version.
 ";
 
 #[derive(Debug, Deserialize)]
 pub struct Args {
+    flag_configure: bool,
+    flag_local: bool,
     cmd_get: bool,
     cmd_configpath: bool,
     cmd_outpath: bool,
@@ -97,7 +103,6 @@ pub struct Args {
     cmd_clean: bool,
     cmd_blendfiles: bool,
     cmd_frames: bool,
-    flag_configure: bool,
     flag_force: bool,
 }
 
@@ -127,7 +132,7 @@ fn main(){
             Ok(app_savepath) => {
                 let mut configpath = app_savepath.clone();
                 configpath.push("config.toml");
-                match Config::from_file(&configpath){
+                match WorkerConfig::from_file(&configpath){
                     Ok(config) => println!("{}", config.outpath.to_string_lossy()),
                     Err(err) => eprintln!("{}", format!(" ✖ Error: {}", err).red())
                 }
@@ -140,7 +145,7 @@ fn main(){
             Ok(app_savepath) => {
                 let mut configpath = app_savepath.clone();
                 configpath.push("config.toml");
-                match Config::from_file(&configpath){
+                match WorkerConfig::from_file(&configpath){
                     Ok(config) => println!("{}", config.blendpath.to_string_lossy()),
                     Err(err) => eprintln!("{}", format!(" ✖ Error: {}", err).red())
                 }
@@ -153,7 +158,7 @@ fn main(){
             Ok(app_savepath) => {
                 let mut configpath = app_savepath.clone();
                 configpath.push("config.toml");
-                match Config::from_file(&configpath){
+                match WorkerConfig::from_file(&configpath){
                     Ok(config) => println!("{}", config.id),
                     Err(err) => eprintln!("{}", format!(" ✖ Error: {}", err).red())
                 }
@@ -166,7 +171,7 @@ fn main(){
             Ok(app_savepath) => {
                 let mut configpath = app_savepath.clone();
                 configpath.push("config.toml");
-                match Config::from_file(&configpath){
+                match WorkerConfig::from_file(&configpath){
                     Ok(config) => println!("{}", config.bender_url),
                     Err(err) => eprintln!("{}", format!(" ✖ Error: {}", err).red())
                 }
@@ -179,7 +184,7 @@ fn main(){
             Ok(app_savepath) => {
                 let mut configpath = app_savepath.clone();
                 configpath.push("config.toml");
-                match Config::from_file(&configpath){
+                match WorkerConfig::from_file(&configpath){
                     Ok(config) => {
                         if args.flag_force{
                             if args.cmd_blendfiles || (!args.cmd_blendfiles && !args.cmd_frames) {

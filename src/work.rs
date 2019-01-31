@@ -2,7 +2,7 @@
 //! state of the program.
 
 use ::*;
-use config::Config;
+use config::WorkerConfig;
 use bender_job::Task;
 use bender_job::History;
 use std::collections::HashMap;
