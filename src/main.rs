@@ -72,7 +72,7 @@ via http GET, renders the Tasks and stores the rendered Frames on disk.
 Usage:
   bender-worker
   bender-worker --configure [--local]
-  bender-worker --local
+  bender-worker --independent
   bender-worker clean [--force]
   bender-worker clean blendfiles [--force]
   bender-worker clean frames [--force]
@@ -85,17 +85,17 @@ Usage:
   bender-worker --version
 
 Options:
-  --force, -f   Don't ask for confirmation, just do it
-  --configure   Run configuration
-  --local, -l   Run local
-  -h --help     Show this screen.
-  --version     Show version.
+  --force, -f         Don't ask for confirmation, just do it
+  --configure         Run configuration
+  --independent, -i   Run local
+  -h --help           Show this screen.
+  --version           Show version.
 ";
 
 #[derive(Debug, Deserialize)]
 pub struct Args {
     flag_configure: bool,
-    flag_local: bool,
+    flag_independent: bool,
     cmd_get: bool,
     cmd_configpath: bool,
     cmd_outpath: bool,

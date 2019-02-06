@@ -107,6 +107,22 @@ pub enum Mode{
     Independent
 }
 
+impl Mode{
+    pub fn is_server(&self) -> bool{
+        match *self{
+            Mode::Server => true,
+            _            => false
+        }
+    }
+
+    pub fn is_independent(&self) -> bool{
+        match *self{
+            Mode::Independent => true,
+            _                 => false
+        }
+    }
+}
+
 
 
 
@@ -159,35 +175,42 @@ pub fn setup_outpath<P>(config: &mut WorkerConfig, p: P) -> GenResult<()> where 
 pub fn get_config<P>(p: P, args: &Args) -> GenResult<WorkerConfig> where P: Into<PathBuf>{
     let p = p.into();
 
-    // Check if we have a bender-config (this indicates we are on a server)
-    let configpath: Option<String> = match Command::new("bender-config")
-                                        .arg("path")
-                                        .output(){
-        Ok(out)     =>  Some(String::from_utf8_lossy(&out.stdout).to_string()),
-        Err(_err)   =>  None
-    };
+    // If there is a --independent or -i flag, immidiately return the local config
+    if args.flag_independent{
+        scrnmsg(format!("Running in Independent Mode. Using the config at {}", p.to_string_lossy()));
+        let c = get_worker_config(p, args)?;
+        Ok(c)
+    }else{
+        // Check if we have a bender-config (this indicates we are on a server)
+        let configpath: Option<String> = match Command::new("bender-config")
+                                            .arg("path")
+                                            .output(){
+            Ok(out)     =>  Some(String::from_utf8_lossy(&out.stdout).to_string()),
+            Err(_err)   =>  None
+        };
 
-    // Try to get a serverconfig if there is one, otherwise get the worker config \
-    // or generate a new one
-    match configpath {
-        Some(path) => {
-            match bender_config::Config::from_file(path.as_str()){
-                Ok(config) => {
-                    scrnmsg(format!("Running in Server Mode. Using the config at {}", path.trim()));
-                    Ok(WorkerConfig::from_serverconfig(config))
-                },
-                Err(err)   => {
-                    errmsg(format!("Failed to read bender's config.toml from {}: {}", path.trim().bold(), err));
-                    notemsg(format!("Attempting to use Workers own config at {} as a fallback", p.to_string_lossy().bold()));
-                    let c = get_worker_config(p, args)?;
-                    Ok(c)
+        // Try to get a serverconfig if there is one, otherwise get the worker config \
+        // or generate a new one
+        match configpath {
+            Some(path) => {
+                match bender_config::Config::from_file(path.as_str()){
+                    Ok(config) => {
+                        scrnmsg(format!("Running in Server Mode. Using the config at {}", path.trim()));
+                        Ok(WorkerConfig::from_serverconfig(config))
+                    },
+                    Err(err)   => {
+                        errmsg(format!("Failed to read bender's config.toml from {}: {}", path.trim().bold(), err));
+                        notemsg(format!("Attempting to use Workers own config at {} as a fallback", p.to_string_lossy().bold()));
+                        let c = get_worker_config(p, args)?;
+                        Ok(c)
+                    }
                 }
+            },
+            None       => {
+                scrnmsg(format!("Running in Independent Mode. Using the config at {}", p.to_string_lossy()));
+                let c = get_worker_config(p, args)?;
+                Ok(c)
             }
-        },
-        None       => {
-            scrnmsg(format!("Running in Independent Mode. Using the config at {}", p.to_string_lossy()));
-            let c = get_worker_config(p, args)?;
-            Ok(c)
         }
     }
 }

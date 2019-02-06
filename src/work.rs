@@ -70,14 +70,16 @@ impl Work{
         }
 
         // Update the parent jobs statuses
-        if self.has_task() {
-            self.update_parent_jobs_stati();
+        if self.has_task() && self.config.mode.is_independent() {
+            self.fetch_parent_jobs_stati();
+        }else if self.config.mode.is_server(){
+            self.read_parent_jobs_stati();
         }
 
         // Get the blendfile from the server only if there are 
         // tasks that actually need one
-        if self.has_task() || !self.tasks.iter().all(|t| t.is_ended()){
-            self.get_blendfiles();
+        if self.config.mode.is_independent() && (self.has_task() || !self.tasks.iter().all(|t| t.is_ended())){
+            self.fetch_blendfiles();
             self.add_paths_to_tasks();
         }
 
@@ -96,7 +98,11 @@ impl Work{
         // Figure out if a blendfile's tasks are all finished. If so request the\
         // job status from flaskbender. If the job has finished and a certain grace\
         // period has passed, delete the blendfile in question
-        if self.has_task() && !self.all_jobs_finished() && self.any_job_finished() {
+        // Don't do this when running in server mode
+        if self.has_task() 
+        && !self.all_jobs_finished() 
+        && self.any_job_finished() 
+        && !self.config.mode.is_server(){
             self.cleanup_blendfiles();
         }
 

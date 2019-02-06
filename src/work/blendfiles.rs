@@ -17,15 +17,15 @@ use ::*;
 use chrono::prelude::*;
 use chrono::Duration;
 use itertools::Itertools;
-use bender_job::{Status, Task};
+use bender_job::{Status, Task, Job};
 
 
 
 
 impl Work{
 
-    /// Update the parent Jobs status
-    pub fn update_parent_jobs_stati(&mut self) {
+    /// Update the parent Jobs status via request
+    pub fn fetch_parent_jobs_stati(&mut self) {
         // Clear the hashmap
         self.parent_jobs.clear();
         // Collect all unique parent ids into a Vec
@@ -49,6 +49,31 @@ impl Work{
                 Err(err) => eprintln!("{}", format!(" ✖ [WORKER] Error: While requesting job status for [{}]: {}", id.to_string(), err).red())
             }
          })
+    }
+
+    /// Update the parent Jobs status via read
+    pub fn read_parent_jobs_stati(&mut self) {
+        // Clear the hashmap
+        self.parent_jobs.clear();
+        // Collect all unique parent ids into a Vec
+        let u: Vec<String> = self.unique_parent_ids()
+                                 .map(|id| id.to_string())
+                                 .collect();
+        // For each unique parent id request the current job status from flaskbender
+        u.iter()
+         .for_each(|id|{
+            let mut path = self.config.blendpath.clone();
+            path.push(id);
+            path.push("data.json");
+            match Job::from_datajson(path){
+                Ok(job)  => {
+                    let s = format!("{}", job.status);
+                    println!("{}", s);
+                    self.parent_jobs.insert(id.to_string(), s);
+                },
+                Err(err) => eprintln!("{}", format!(" ✖ [WORKER] Error: While reading job status for [{}]: {}", id.to_string(), err).red())
+            }
+        });
     }
 
     /// Check whether the given job id is queued
@@ -149,7 +174,7 @@ impl Work{
     }
 
     /// Deals with reqeusting new blendfiles
-    pub fn get_blendfiles(&mut self){
+    pub fn fetch_blendfiles(&mut self){
         // Get a unique list from the tasks job ids, ignoring job IDs that are 
         // present as keys for the HashMap self.blendfiles already
         let ids: Vec<String> = self.unique_parent_ids()
