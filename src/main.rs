@@ -392,6 +392,12 @@ pub fn errrun<S>(s: S) where S: Into<String>{
     eprintln!("{}{}", label, s);
 }
 
+pub fn okrun<S>(s: S) where S: Into<String>{
+    let s = s.into();
+    let label = " ✔️ [WORKER] ".green();
+    println!("{}{}", label, s);
+}
+
 pub fn scrnmsg<S>(s: S) where S: Into<String>{
     let s = s.into();
     let subs = s.as_bytes()

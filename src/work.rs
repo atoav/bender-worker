@@ -78,8 +78,12 @@ impl Work{
 
         // Get the blendfile from the server only if there are 
         // tasks that actually need one
-        if self.config.mode.is_independent() && (self.has_task() || !self.tasks.iter().all(|t| t.is_ended())){
-            self.fetch_blendfiles();
+        if self.has_task() || !self.tasks.iter().all(|t| t.is_ended()){
+            if self.config.mode.is_independent() {
+                self.fetch_blendfiles();
+            }else{
+                self.read_blendfiles();
+            }
             self.add_paths_to_tasks();
         }
 

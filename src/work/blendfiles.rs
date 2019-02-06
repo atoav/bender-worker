@@ -43,10 +43,10 @@ impl Work{
                         Some(s) => {
                             self.parent_jobs.insert(id.to_string(), s.to_string());
                         },
-                        None => eprintln!("{}", format!(" ✖ [WORKER] Error: While requesting job status for [{}], malformed response", id.to_string()).red())
+                        None => errrun(format!("While requesting job status for [{}], malformed response", id.to_string()))
                     }
                 },
-                Err(err) => eprintln!("{}", format!(" ✖ [WORKER] Error: While requesting job status for [{}]: {}", id.to_string(), err).red())
+                Err(err) => errrun(format!("While requesting job status for [{}]: {}", id.to_string(), err))
             }
          })
     }
@@ -71,7 +71,7 @@ impl Work{
                     println!("{}", s);
                     self.parent_jobs.insert(id.to_string(), s);
                 },
-                Err(err) => eprintln!("{}", format!(" ✖ [WORKER] Error: While reading job status for [{}]: {}", id.to_string(), err).red())
+                Err(err) => errrun(format!("While reading job status for [{}]: {}", id.to_string(), err))
             }
         });
     }
@@ -150,17 +150,17 @@ impl Work{
                             true => {
                                 match fs::remove_file(&path){
                                     Ok(_) => {
-                                        println!("{}", format!(" ✔️ [WORKER] Deleted blendfile for finished job [{}]", id).green());
+                                        okrun(format!("Deleted blendfile for finished job [{}]", id));
                                         true
                                     },
                                     Err(err) => {
-                                        eprintln!("{}", format!(" ✖ [WORKER] Error: Couldn't delete blendfile for finished job ({}): {}", path.to_string_lossy(), err).red());
+                                        errrun(format!("Couldn't delete blendfile for finished job ({}): {}", path.to_string_lossy(), err));
                                         false
                                     }
                                 }
                             },
                             false =>{
-                                 println!("ಠ_ಠ [WORKER] Tried to delete blendfile for finished job at {}, but it was already gone... that is okay I guess..", path.to_string_lossy());
+                                 okrun(format!("ಠ_ಠ Tried to delete blendfile for finished job at {}, but it was already gone... that is okay I guess..", path.to_string_lossy()));
                                  true
                             }
                         };
@@ -169,11 +169,12 @@ impl Work{
                     .filter(|&(_, erase)| erase)
                     .for_each(|(id, _)| {
                         let _ = self.blendfiles.remove(id.as_str());
-                        println!("{}", format!(" ✔️ [WORKER] Forgot blendfile for [{}]", id).green());
+                        okrun(format!("Forgot blendfile for [{}]", id));
                     } );
     }
 
-    /// Deals with reqeusting new blendfiles
+    /// Deals with reqeusting new blendfiles from flaskbender, inserts the paths
+    /// into self.blendfiles
     pub fn fetch_blendfiles(&mut self){
         // Get a unique list from the tasks job ids, ignoring job IDs that are 
         // present as keys for the HashMap self.blendfiles already
@@ -203,7 +204,60 @@ impl Work{
         // Some<Blendfile> in Work::blendfiles, we assume that all files have \
         // been downloaded 
         if ids.len() == self.blendfiles.iter().map(|(_,x)| x).filter(|e|e.is_some()).count(){
-            println!("{}", format!(" ✔️ [WORKER] Downloaded all blendfiles").green());
+            okrun("Downloaded all blendfiles");
+            self.display_divider = true;
+        }
+    }
+
+    /// Deals with reading new blendfiles from disk, inserts the results into
+    /// self.blendfiles
+    pub fn read_blendfiles(&mut self){
+        // Get a unique list from the tasks job ids, ignoring job IDs that are 
+        // present as keys for the HashMap self.blendfiles already
+        let ids: Vec<String> = self.unique_parent_ids()
+                                   .filter(|&id| !self.has_blendfile_by_id(id))
+                                   .map(|id| id.to_owned())
+                                   .collect();
+
+        // Only read if there are jobs to be read
+        if ids.len() != 0{ 
+            // For each remaining ID find a blendfile and insert the resulting path
+            // into the hashmap
+            ids.iter()
+                .for_each(|id|{
+                    let mut p = self.config.blendpath.clone();
+                    p.push(id.to_owned());
+                    let blendfile = match fs::read_dir(p.clone()){
+                        Ok(paths) => {
+                            paths.into_iter()
+                                 .filter(|direntry| direntry.is_ok())
+                                 .map(|direntry| direntry.unwrap().path())
+                                 .find(|path| {
+                                    match path.extension(){
+                                        Some(ext) => ext == std::ffi::OsStr::new("blend"),
+                                        None      => false
+                                    }
+                                 })
+                        },
+                        Err(err) => {
+                            errrun(format!("Directory for blendfile at {} doesn't exist: {}", p.to_string_lossy(), err));
+                            None
+                        }
+                    };
+                    // Create a Blendfile from the Option<PathBuf>
+                    let opt_bf = match blendfile{
+                        Some(b) => Some(Blendfile::new(b)),
+                        None    => None
+                    };
+                    self.blendfiles.insert(id.to_string(), opt_bf);
+                 });
+        }
+
+        // If the length of unique ids equals the length of entries containing \
+        // Some<Blendfile> in Work::blendfiles, we assume that all files have \
+        // been read 
+        if ids.len() == self.blendfiles.iter().map(|(_,x)| x).filter(|e|e.is_some()).count(){
+            okrun("Read all blendfiles");
             self.display_divider = true;
         }
     }
