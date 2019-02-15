@@ -55,7 +55,6 @@ use bender_mq::{Channel, BenderMQ};
 pub mod system;
 
 pub mod config;
-use config::WorkerConfig;
 
 pub mod work;
 use work::*;
@@ -76,7 +75,6 @@ Usage:
   bender-worker clean [--force]
   bender-worker clean blendfiles [--force]
   bender-worker clean frames [--force]
-  bender-worker get configpath
   bender-worker get outpath
   bender-worker get blendpath
   bender-worker get id
@@ -97,7 +95,6 @@ pub struct Args {
     flag_configure: bool,
     flag_independent: bool,
     cmd_get: bool,
-    cmd_configpath: bool,
     cmd_outpath: bool,
     cmd_blendpath: bool,
     cmd_benderurl: bool,
@@ -117,24 +114,12 @@ fn main(){
                             .unwrap_or_else(|e| e.exit());
 
 
-    if args.cmd_get && args.cmd_configpath{
-        // Print just the path of the application folder
-        match get_app_root(AppDataType::UserConfig, &APP_INFO){
-            Err(err) => eprintln!("{}", format!(" ✖ Error: : Couldn't get application folder: {}", err).red()),
-            Ok(app_savepath) => {
-                let mut p = app_savepath.clone();
-                p.push("config.toml");
-                println!("{}", p.to_string_lossy());
-            }
-        }
     // Read the config (if there is one) and get the path for frames
-    }else if args.cmd_get && args.cmd_outpath{
+    if args.cmd_get && args.cmd_outpath{
         match get_app_root(AppDataType::UserConfig, &APP_INFO){
             Err(err) => eprintln!("{}", format!(" ✖ Error: {}", err).red()),
             Ok(app_savepath) => {
-                let mut configpath = app_savepath.clone();
-                configpath.push("config.toml");
-                match WorkerConfig::from_file(&configpath){
+                match config::get_config(&app_savepath, &args){
                     Ok(config) => println!("{}", config.outpath.to_string_lossy()),
                     Err(err) => eprintln!("{}", format!(" ✖ Error: {}", err).red())
                 }
@@ -145,9 +130,7 @@ fn main(){
         match get_app_root(AppDataType::UserConfig, &APP_INFO){
             Err(_err) => (), // Couldn't get app_savepath
             Ok(app_savepath) => {
-                let mut configpath = app_savepath.clone();
-                configpath.push("config.toml");
-                match WorkerConfig::from_file(&configpath){
+                match config::get_config(&app_savepath, &args){
                     Ok(config) => println!("{}", config.blendpath.to_string_lossy()),
                     Err(err) => eprintln!("{}", format!(" ✖ Error: {}", err).red())
                 }
@@ -158,9 +141,7 @@ fn main(){
         match get_app_root(AppDataType::UserConfig, &APP_INFO){
             Err(_err) => (), // Couldn't get app_savepath
             Ok(app_savepath) => {
-                let mut configpath = app_savepath.clone();
-                configpath.push("config.toml");
-                match WorkerConfig::from_file(&configpath){
+                match config::get_config(&app_savepath, &args){
                     Ok(config) => println!("{}", config.id),
                     Err(err) => eprintln!("{}", format!(" ✖ Error: {}", err).red())
                 }
@@ -171,9 +152,7 @@ fn main(){
         match get_app_root(AppDataType::UserConfig, &APP_INFO){
             Err(_err) => (), // Couldn't get app_savepath
             Ok(app_savepath) => {
-                let mut configpath = app_savepath.clone();
-                configpath.push("config.toml");
-                match WorkerConfig::from_file(&configpath){
+                match config::get_config(&app_savepath, &args){
                     Ok(config) => println!("{}", config.bender_url),
                     Err(err) => eprintln!("{}", format!(" ✖ Error: {}", err).red())
                 }
@@ -184,9 +163,7 @@ fn main(){
         match get_app_root(AppDataType::UserConfig, &APP_INFO){
             Err(_err) => (), // Couldn't get app_savepath
             Ok(app_savepath) => {
-                let mut configpath = app_savepath.clone();
-                configpath.push("config.toml");
-                match WorkerConfig::from_file(&configpath){
+                match config::get_config(&app_savepath, &args){
                     Ok(config) => {
                         if args.flag_force{
                             if args.cmd_blendfiles || (!args.cmd_blendfiles && !args.cmd_frames) {
@@ -267,13 +244,6 @@ fn main(){
 
 
 
-/// Return the width of the terminal
-fn width() -> usize{
-    let term = Term::stdout();
-    term.size().1 as usize
-}
-
-
 
 
 fn run(args: &Args) {
@@ -298,7 +268,6 @@ fn run(args: &Args) {
                             println!("{}", "Deleted the configuration file. Run worker again for a fresh new start".on_green());
                         }
                     }
-
                 },
                 Ok(config) => {
                     if !system::blender_in_path(){
@@ -364,6 +333,15 @@ fn run(args: &Args) {
     }
 }
 
+
+
+
+
+/// Return the width of the terminal
+fn width() -> usize{
+    let term = Term::stdout();
+    term.size().1 as usize
+}
 
 /// A fancy error message
 pub fn errmsg<S>(s: S) where S: Into<String>{

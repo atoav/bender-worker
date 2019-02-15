@@ -174,7 +174,6 @@ pub fn setup_outpath<P>(config: &mut WorkerConfig, p: P) -> GenResult<()> where 
 /// and return a working config, either in server mode or in independent mode
 pub fn get_config<P>(p: P, args: &Args) -> GenResult<WorkerConfig> where P: Into<PathBuf>{
     let p = p.into();
-
     // If there is a --independent or -i flag, immidiately return the local config
     if args.flag_independent{
         scrnmsg(format!("Running in Independent Mode. Using the config at {}", p.to_string_lossy()));
