@@ -19,7 +19,7 @@ assets = [
 amqp = { version = "0.1.2", default-features = false }
 app_dirs = "1.2"
 chrono = { version = "0.4", features = ["serde"] }
-colored = "1.6"
+colored = "1.7"
 console = "0.6"
 dialoguer = "0.3"
 docopt = "1"
