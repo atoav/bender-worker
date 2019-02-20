@@ -52,16 +52,13 @@ impl Work {
                         // The body is a stream, and for_each returns a new Future
                         // when the stream is finished, and calls the closure on
                         // each chunk of the body and writes the file to the file
-                        let status = response.status().clone();
+                        let status = response.status();
                         // Run the closure on each of the chunks
                         response.into_body().for_each(move |chunk| {
                             if status.is_success() {
                                 // Create File only if it doesn't exist yet,
                                 // if it _exists_ open it instead!
-                                let file =  match savepath.exists(){
-                                    false => File::create(&savepath),
-                                    true => File::open(&savepath)
-                                };
+                                let file =  if savepath.exists() { File::open(&savepath) } else { File::create(&savepath) };
 
                                 // Discard Chunks when the file is not ok
                                 match file{
@@ -97,8 +94,9 @@ impl Work {
                         }
                   })
         }));
-            // If everything worked out, insert the id with the path to the file into the values
-            savepath3
+        
+        // If everything worked out, insert the id with the path to the file into the values
+        savepath3
     }
 
 
@@ -116,12 +114,7 @@ impl Work {
             .header(USER_AGENT, "bender-worker")
             .send()?
             .text()?;
-        // println!(" ⛁ [WORKER] Requested status of job [{}] is {}", id.clone(), res);
         Ok(res)
     }
 
-
-
-
-    
 }

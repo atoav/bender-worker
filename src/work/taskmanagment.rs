@@ -8,7 +8,11 @@ use std::thread::sleep;
 use std::time::Duration;
 use amqp::Basic;
 use bender_job::Task;
+use bender_mq::BenderMQ;
 use work::blendfiles::format_duration;
+
+
+
 
 impl Work{
     /// Returns true if a new task should be added. This depends on two factors:
@@ -17,7 +21,7 @@ impl Work{
     pub fn should_add(&self) -> bool{
         // Return early if ther isn't enough space
         if system::enough_space(&self.config.outpath, self.config.disklimit){
-            eprintln!("{}", format!(" ❗ [WORKER] Warning: Taking no new jobs").black().on_yellow());
+            eprintln!("{}", " ❗ [WORKER] Warning: Taking no new jobs".to_string().black().on_yellow());
             system::print_space_warning(&self.config.outpath, self.config.disklimit);
             let timeout = Duration::from_secs(5);
             sleep(timeout);
@@ -27,11 +31,7 @@ impl Work{
             let active_task_count = self.tasks.iter()
                                          .filter(|t| !t.is_ended())
                                          .count();
-            if active_task_count >= self.config.workload {
-                false
-            }else{
-                true
-            }
+            active_task_count < self.config.workload
         }
 
         // let self.unique_parent_ids()
@@ -56,7 +56,7 @@ impl Work{
                             t.add_data("task-delivery-tag", message.reply.delivery_tag.to_string().as_str());
                             
                             // Add this as a event to the tasks history
-                            let h = format!("[WORKER] Task arrived at Worker [{}] with delivery tag {}", self.config.id, t.data.get("task-delivery-tag").unwrap());
+                            let h = format!("[WORKER] Task arrived at Worker [{}] with delivery tag {}", self.config.id, &t.data["task-delivery-tag"]);
                             self.add_history(h.as_str());
                             
                             // Set the status of the task to queued
@@ -88,7 +88,7 @@ impl Work{
 
     /// Returns true if there is at least one task
     pub fn has_task(&self) -> bool{
-        self.tasks.len() > 0
+        !self.tasks.is_empty()
     }
 
     /// Return all tasks that have a given parent id
@@ -147,19 +147,16 @@ impl Work{
 
             // Match the result of above find operation and assign it to
             // self.current only if there is an actual Task
-            match next{
-                Some(mut t) => {
-                    t.start();
-                    println!(" ✚ [WORKER] Queued task [{}] for job [{}]", t.id, t.parent_id);
-                    self.display_divider = true;
-                    let routing_key = format!("worker.{}", self.config.id);
-                    match channel.post_task_info(&t, routing_key){
-                        Ok(_) => (),
-                        Err(err) => eprintln!("{}", format!(" ✖ [WORKER] Error: Couldn't post current task to info queue: {}", err).red())
-                    }
-                    self.current = Some(t);
-                },
-                None => () //println!("Debug: Queued none, there was no next...")
+            if let Some(mut t) = next {
+                t.start();
+                println!(" ✚ [WORKER] Queued task [{}] for job [{}]", t.id, t.parent_id);
+                self.display_divider = true;
+                let routing_key = format!("worker.{}", self.config.id);
+                match channel.post_task_info(&t, routing_key){
+                    Ok(_) => (),
+                    Err(err) => eprintln!("{}", format!(" ✖ [WORKER] Error: Couldn't post current task to info queue: {}", err).red())
+                }
+                self.current = Some(t);
             }
         }else{
              //println!("Debug: didn't get a new task because the old is running");
@@ -176,12 +173,10 @@ impl Work{
             self.tasks.push(t.clone());
 
             // Ack the finished Task!
-            let deliver_tag = t.data.get("task-delivery-tag")
-                                    .clone()
-                                    .unwrap()
-                                    .parse::<u64>()
-                                    .unwrap();
-            if let Err(err) = channel.basic_ack(deliver_tag, false){
+            let deliver_tag = &t.data["task-delivery-tag"]
+                                .parse::<u64>()
+                                .unwrap();
+            if let Err(err) = channel.basic_ack(*deliver_tag, false){
                 eprintln!(" ✖ [WORKER] Error: Couldn't acknowledge task {} for job [{}]: {}", 
                     t.command.short(), 
                     t.parent_id,
@@ -254,15 +249,12 @@ impl Work{
         self.tasks.iter_mut()
                   .filter(|task| !task.data.contains_key("blendfile"))
                   .for_each(|task|{
-                      match blendfiles.get(&task.parent_id){
-                          Some(blendfile) => {
-                            match blendfile{
-                                Some(bf) => task.add_data("blendfile", &bf.path.to_string_lossy()),
-                                None => ()
-                            }
-                          },
-                          None => ()
-                      }
+                    if let Some(blendfile) = blendfiles.get(&task.parent_id) {
+                        match blendfile{
+                            Some(bf) => task.add_data("blendfile", &bf.path.to_string_lossy()),
+                            None => ()
+                        }
+                    }
                   })
     }
 }

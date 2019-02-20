@@ -38,7 +38,7 @@ impl Work{
             match self.request_jobstatus(id.to_string()) {
                 Ok(status) => {
                     // Status is a string that looks like this: {'Job': 'Queued'}
-                    let status = status.split("\'").collect::<Vec<&str>>();
+                    let status = status.split('\'').collect::<Vec<&str>>();
                     match status.get(3){
                         Some(s) => {
                             self.parent_jobs.insert(id.to_string(), s.to_string());
@@ -65,13 +65,24 @@ impl Work{
             let mut path = self.config.blendpath.clone();
             path.push(id);
             path.push("data.json");
-            match Job::from_datajson(path){
-                Ok(job)  => {
-                    let s = format!("{}", job.status);
-                    println!("{}", s);
-                    self.parent_jobs.insert(id.to_string(), s);
-                },
-                Err(err) => errrun(format!("While reading job status for [{}]: {}", id.to_string(), err))
+            let mut read = false;
+            while !read {
+                read = match Job::from_datajson(&path){
+                    Ok(job)  => {
+                        let s = format!("{}", job.status);
+                        println!("{}", s);
+                        self.parent_jobs.insert(id.to_string(), s);
+                        true
+                    },
+                    Err(ref e) if format!("{}", &e).contains("EOF") => {
+                        errrun(format!("EOF while reading job status for [{}]: {}\nTrying again", id.to_string(), e));
+                        false
+                    }
+                    Err(err) => {
+                        errrun(format!("While reading job status for [{}]: {}", id.to_string(), err));
+                        true
+                    }
+                }
             }
         });
     }
@@ -146,23 +157,20 @@ impl Work{
         shall_finish.iter()
                     .map(|(id, path)|{
                         let erase: bool = 
-                        match path.exists(){
-                            true => {
-                                match fs::remove_file(&path){
-                                    Ok(_) => {
-                                        okrun(format!("Deleted blendfile for finished job [{}]", id));
-                                        true
-                                    },
-                                    Err(err) => {
-                                        errrun(format!("Couldn't delete blendfile for finished job ({}): {}", path.to_string_lossy(), err));
-                                        false
-                                    }
+                        if path.exists() {
+                            match fs::remove_file(&path){
+                                Ok(_) => {
+                                    okrun(format!("Deleted blendfile for finished job [{}]", id));
+                                    true
+                                },
+                                Err(err) => {
+                                    errrun(format!("Couldn't delete blendfile for finished job ({}): {}", path.to_string_lossy(), err));
+                                    false
                                 }
-                            },
-                            false =>{
-                                 okrun(format!("ಠ_ಠ Tried to delete blendfile for finished job at {}, but it was already gone... that is okay I guess..", path.to_string_lossy()));
-                                 true
                             }
+                        } else {
+                             okrun(format!("ಠ_ಠ Tried to delete blendfile for finished job at {}, but it was already gone... that is okay I guess..", path.to_string_lossy()));
+                             true
                         };
                         (id, erase)
                     })
@@ -184,17 +192,14 @@ impl Work{
                                    .collect();
 
         // Only dispatch a request if we have something to reqeust
-        if ids.len() != 0{ 
+        if !ids.is_empty(){ 
             // For each remaining ID start a request and insert the resulting path
             // into the hashmap
             ids.iter()
                 .for_each(|id|{
                     let p = self.request_blendfile(id.to_owned());
                     // println!("{:?}", p);
-                    let opt_bf = match p.as_path().exists(){
-                        true => Some(Blendfile::new(p)),
-                        false => None
-                    };
+                    let opt_bf = if p.as_path().exists() { Some(Blendfile::new(p)) } else { None };
                     self.blendfiles.insert(id.to_string(), opt_bf);
                     
                  });
@@ -220,7 +225,7 @@ impl Work{
                                    .collect();
 
         // Only read if there are jobs to be read
-        if ids.len() != 0{ 
+        if !ids.is_empty(){ 
             // For each remaining ID find a blendfile and insert the resulting path
             // into the hashmap
             ids.iter()
@@ -229,8 +234,7 @@ impl Work{
                     p.push(id.to_owned());
                     let blendfile = match fs::read_dir(p.clone()){
                         Ok(paths) => {
-                            paths.into_iter()
-                                 .filter(|direntry| direntry.is_ok())
+                            paths.filter(|direntry| direntry.is_ok())
                                  .map(|direntry| direntry.unwrap().path())
                                  .find(|path| {
                                     match path.extension(){
@@ -275,12 +279,7 @@ impl Work{
     /// Returns true if the Tasks blendfile is 
     pub fn has_blendfile(&self, t: &Task) -> bool{
         match self.blendfiles.get(&t.parent_id) {
-            Some(entry) => {
-                match entry{
-                    Some(_) => true,
-                    None => false
-                }
-            },
+            Some(entry) => entry.is_some(),
             None => false
         }
     }
@@ -289,12 +288,7 @@ impl Work{
     pub fn has_blendfile_by_id<S>(&self, id: S) -> bool where S: Into<String>{
         let id = id.into();
         match self.blendfiles.get(&id) {
-            Some(entry) => {
-                match entry{
-                    Some(_) => true,
-                    None => false
-                }
-            },
+            Some(entry) => entry.is_some(),
             None => false
         }
     }

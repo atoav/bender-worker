@@ -10,7 +10,7 @@ use dialoguer::Input;
 use std::process::Command;
 
 // Default parameters
-const BENDER_URL: &'static str = "http://0.0.0.0:5000";
+const BENDER_URL: &str = "http://0.0.0.0:5000";
 const DISKLIMIT: u64 =           200*1_000_000;
 const WORKLOAD: usize =          1;
 const GRACE_PERIOD: u64 =        60;
@@ -35,6 +35,12 @@ pub struct WorkerConfig{
 
 
 
+
+impl Default for config::WorkerConfig {
+    fn default() -> Self {
+        Self::new()
+    }
+}
 
 impl WorkerConfig{
     /// Create a new configuration with default values
@@ -220,36 +226,33 @@ pub fn get_worker_config<P>(p: P, args: &Args) -> GenResult<WorkerConfig> where 
     let mut p = p.into();
     let d = p.clone();
     p.push("config.toml");
-    match Path::new(&p).exists() && !args.flag_configure{
-        true => {
-            okmsg(format!("Reading the Configuration from:     {}", p.to_string_lossy().bold()));
-            // Deserialize it from file
-            let config = WorkerConfig::from_file(&p)?;
-            Ok(config)
-        },
-        false => {
-            // No WorkerConfig on disk. Create a new one and attempt to write it there
-            if !args.flag_configure{
-                notemsg(format!("No Configuration found at \"{}\"", p.to_string_lossy()));
-                notemsg(format!("Generating a new one"));
-            }
-            // Create directories on the way
-            fs::create_dir_all(&d)?;
-            // Get a new config
-            let mut config = WorkerConfig::new();
-            // Ask the user where to save blendfilesfiles
-            while let Err(e) = setup_blendpath(&mut config, &d){
-                errmsg(format!("This is not a valid directory: {}", e));
-            }
-            // Ask the user where to save the rendered Frames
-            while let Err(e) = setup_outpath(&mut config, &d){
-                errmsg(format!("This is not a valid directory: {}", e));
-            }
-
-            // Write it to file
-            config.to_file(p.to_string_lossy())?;
-            Ok(config)
+    if Path::new(&p).exists() && !args.flag_configure {
+        okmsg(format!("Reading the Configuration from:     {}", p.to_string_lossy().bold()));
+        // Deserialize it from file
+        let config = WorkerConfig::from_file(&p)?;
+        Ok(config)
+    } else {
+        // No WorkerConfig on disk. Create a new one and attempt to write it there
+        if !args.flag_configure{
+            notemsg(format!("No Configuration found at \"{}\"", p.to_string_lossy()));
+            notemsg("Generating a new one".to_string());
         }
+        // Create directories on the way
+        fs::create_dir_all(&d)?;
+        // Get a new config
+        let mut config = WorkerConfig::new();
+        // Ask the user where to save blendfilesfiles
+        while let Err(e) = setup_blendpath(&mut config, &d){
+            errmsg(format!("This is not a valid directory: {}", e));
+        }
+        // Ask the user where to save the rendered Frames
+        while let Err(e) = setup_outpath(&mut config, &d){
+            errmsg(format!("This is not a valid directory: {}", e));
+        }
+
+        // Write it to file
+        config.to_file(p.to_string_lossy())?;
+        Ok(config)
     }
 }
 

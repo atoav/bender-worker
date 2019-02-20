@@ -40,7 +40,7 @@ impl Work{
     /// Create a new task with a given config
     pub fn new(config: WorkerConfig) -> Self{
         Work{
-            config: config,
+            config,
             tasks: Vec::<Task>::new(),
             current: None,
             history: History::new(),
@@ -56,8 +56,6 @@ impl Work{
     pub fn add_history<S>(&mut self, value: S) where S: Into<String> {
         self.history.insert(Utc::now(), value.into());
     }
-
-
 
 
     /// Runs every loop and updates everything. This is the meat of the business\
@@ -119,16 +117,16 @@ impl Work{
 
     /// Print a horizontal divider if the flag is set and reset the flag afterwards
     fn print_divider(&mut self) {
-        if self.display_divider || !self.display_divider {
+        if self.display_divider {
             println!("{}", "-".repeat(width()));
             self.display_divider = false;
             let a = self.tasks.iter().count();
             let f = self.tasks.iter().filter(|t| t.is_finished()).count();
             let q = self.tasks.iter().filter(|t| t.is_queued()).count();
             let w = self.tasks.iter().filter(|t| t.is_waiting()).count();
-            let r = self.current.is_some();
+            let cur = self.current.is_some();
             if cfg!(debug_assertions) {
-                eprintln!("All: {}    Finished: {}    Queued: {}     Waiting: {}    Current: {}", a,  f, q, w, r);
+                eprintln!("All: {}    Finished: {}    Queued: {}     Waiting: {}    Current: {}", a,  f, q, w, cur);
             }
         }
     }
