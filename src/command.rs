@@ -200,13 +200,6 @@ pub fn run(args: &Args) {
                     // Print the space left on the Worker Machine (at the path of the Application Data)
                     system::print_space_warning(&config.outpath, config.disklimit);
 
-                    // Create a empty message buffer for debouncing
-                    // let mut info_messages = MessageBuffer::new();
-
-                    // Buffer for delivery tags
-                    // let mut delivery_tags = Vec::<u64>::new();
-                    let mut pmessage = "".to_string();
-
                     let mut work = Work::new(config.clone());
 
                     scrnmsg("v".repeat(width()).to_string());
@@ -214,14 +207,6 @@ pub fn run(args: &Args) {
 
                     loop{
                         work.update(&mut channel);
-
-                        // Debounced Message handling
-                        let message = "".to_string();
-
-                        if message != pmessage{
-                            println!("{}", message);
-                            pmessage = message;
-                        }
                     }
                 }   
             }

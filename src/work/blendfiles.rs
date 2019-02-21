@@ -70,7 +70,6 @@ impl Work{
                 read = match Job::from_datajson(&path){
                     Ok(job)  => {
                         let s = format!("{}", job.status);
-                        println!("{}", s);
                         self.parent_jobs.insert(id.to_string(), s);
                         true
                     },

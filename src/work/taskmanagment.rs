@@ -62,9 +62,9 @@ impl Work{
                             // Set the status of the task to queued
                             t.queue();
 
-                            println!(" ✚ [WORKER] Received Task [{id}] ({len})", 
-                                id=t.id,
-                                len=self.tasks.len());
+                            println!(" ✚ [WORKER][{id}] Received Task for {short}", 
+                                id=&t.id[..6],
+                                short=t.command.short());
                             // Add the newly modified Task to the queue
                             self.tasks.push(t);
                         },
@@ -149,7 +149,7 @@ impl Work{
             // self.current only if there is an actual Task
             if let Some(mut t) = next {
                 t.start();
-                println!(" ✚ [WORKER] Queued task [{}] for job [{}]", t.id, t.parent_id);
+                println!(" ✚ [WORKER][{}] Queued task for job [{}]", &t.id[..6], t.parent_id);
                 self.display_divider = true;
                 let routing_key = format!("start.{}", self.config.id);
                 match t.serialize_to_u8(){
@@ -230,11 +230,11 @@ impl Work{
             t.error();
             self.tasks.push(t.clone());
             moved = true;
-            eprintln!("{}", format!(" ✖ [WORKER] Errored task [{}] for job [{}]: {}", t.id, t.parent_id, err).red());
+            eprintln!("{}", format!(" ✖ [WORKER] Errored task [{}] for job [{}]: {}", &t.id[..6], t.parent_id, err).red());
             let routing_key = format!("error.{}", self.config.id);
             match t.serialize_to_u8(){
                 Ok(task_json) => channel.worker_post(routing_key, task_json),
-                Err(err) => eprintln!(" ✖ [WORKER] Error: Failed ot deserialize Task {}: {}", t.id, err)
+                Err(err) => eprintln!(" ✖ [WORKER] Error: Failed to deserialize Task {}: {}", &t.id[..6], err)
             }
         }
 

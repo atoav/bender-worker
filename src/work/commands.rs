@@ -28,7 +28,7 @@ impl Work{
                .for_each(|task|{
                 // we can unwrap this because, the key "blendfile" only exists
                    // if there is a value
-                let p = task.data.get("blendfile").unwrap().clone();
+                let p = &task.data["blendfile"].clone();
                 let mut out = self.config.outpath.clone();
                 out.push(task.parent_id.as_str());
                 if !out.exists(){
@@ -38,11 +38,11 @@ impl Work{
                     }  
                 }
                 if out.exists(){
-                    let outstr = out.clone().to_string_lossy().to_string();
-                    task.construct(p, outstr);
+                    let outstr = out.to_string_lossy().to_string();
+                    task.construct(p.clone(), outstr.clone());
                     self.display_divider = true;
                     match task.command{
-                        bender_job::Command::Blender(ref c) => println!(" ✚ [WORKER] Constructed task for frame [{}]", c.frame),
+                        bender_job::Command::Blender(ref c) => println!(" ✚ [WORKER][{}] Constructed task for frame [{}]", &task.id[..6], c.frame),
                         _ => println!(" ✚ [WORKER] Constructed generic task [{}]", task.id)
                     }
                 }
@@ -72,7 +72,7 @@ impl Work{
                                                    .stderr(Stdio::piped())
                                                    .spawn(){
                                 Ok(c) => {
-                                    println!(" ⚟ [WORKER] Dispatched Command: \"blender {}\"", args.join(" "));
+                                    println!(" ⚟ [WORKER][{}] Dispatched Command: \"blender {}\"", &task.id[..6], args.join(" "));
                                     self.command = Some(c);
                                     
                                     ExitStatus::Running
@@ -159,6 +159,6 @@ pub fn process_stdout(child:&mut std::process::Child){
                     // println!("{}", message);
                   });
         },
-        None => eprintln!("{}", format!(" ✖ [WORKER] Error: Couldn't get a stdout").red())
+        None => eprintln!("{}", " ✖ [WORKER] Error: Couldn't get a stdout".to_string().red())
     }
 }
