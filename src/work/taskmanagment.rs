@@ -151,11 +151,12 @@ impl Work{
                 t.start();
                 println!(" ✚ [WORKER] Queued task [{}] for job [{}]", t.id, t.parent_id);
                 self.display_divider = true;
-                let routing_key = format!("worker.{}", self.config.id);
-                match channel.post_task_info(&t, routing_key){
-                    Ok(_) => (),
-                    Err(err) => eprintln!("{}", format!(" ✖ [WORKER] Error: Couldn't post current task to info queue: {}", err).red())
+                let routing_key = format!("start.{}", self.config.id);
+                match t.serialize_to_u8(){
+                    Ok(task_json) => channel.worker_post(routing_key, task_json),
+                    Err(err) => eprintln!(" ✖ [WORKER] Error: Failed ot deserialize Task {}: {}", t.id, err)
                 }
+                
                 self.current = Some(t);
             }
         }else{
@@ -184,9 +185,10 @@ impl Work{
             }
 
             // Post the updated Task Info
-            let routing_key = format!("worker.{}", self.config.id);
-            if let Err(err) = channel.post_task_info(&t, routing_key){
-                eprintln!("{}", format!(" ✖ [WORKER] Error: Couldn't post current task to info queue: {}", err).red())
+            let routing_key = format!("finish.{}", self.config.id);
+            match t.serialize_to_u8(){
+                Ok(task_json) => channel.worker_post(routing_key, task_json),
+                Err(err) => eprintln!(" ✖ [WORKER] Error: Failed ot deserialize Task {}: {}", t.id, err)
             }
 
             moved = true;
@@ -229,10 +231,10 @@ impl Work{
             self.tasks.push(t.clone());
             moved = true;
             eprintln!("{}", format!(" ✖ [WORKER] Errored task [{}] for job [{}]: {}", t.id, t.parent_id, err).red());
-            let routing_key = format!("worker.{}", self.config.id);
-            match channel.post_task_info(&t, routing_key){
-                Ok(_) => (),
-                Err(err) => eprintln!("{}", format!(" ✖ [WORKER] Error: Couldn't post current task to info queue: {}", err).red())
+            let routing_key = format!("error.{}", self.config.id);
+            match t.serialize_to_u8(){
+                Ok(task_json) => channel.worker_post(routing_key, task_json),
+                Err(err) => eprintln!(" ✖ [WORKER] Error: Failed ot deserialize Task {}: {}", t.id, err)
             }
         }
 

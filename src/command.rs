@@ -185,13 +185,16 @@ pub fn run(args: &Args) {
                     let url = "amqp://localhost//".to_string();
                     scrnmsg(format!("Listening on for AMQP traffic at:   {}", url));
                     scrnmsg(format!("Storing jobs at:                    {}", config.blendpath.to_string_lossy()));
-                    let mut channel = Channel::open_default_channel().unwrap_or_else(|_| panic!("{}", " ✖ [WORKER] Error: Couldn't aquire channel".to_string().red()));
+                    let mut channel = Channel::open_default_channel()
+                                              .unwrap_or_else(|_| panic!("{}", " ✖ [WORKER] Error: Couldn't aquire channel".to_string().red()));
 
                     // Declare a Work exchange
-                    channel.create_work_queue().unwrap_or_else(|_| panic!("{}", " ✖ [WORKER] Error: Declaration of work queue failed".to_string().red()));
+                    channel.create_work_queue()
+                           .unwrap_or_else(|_| panic!("{}", " ✖ [WORKER] Error: Declaration of work queue failed".to_string().red()));
 
                     // Declare a topic exchange
-                    channel.declare_topic_exchange().unwrap_or_else(|_| panic!("{}", " ✖ [WORKER] Error: Declaration of topic exchange failed".to_string().red()));
+                    channel.declare_worker_exchange()
+                           .unwrap_or_else(|_| panic!("{}", " ✖ [WORKER] Error: Declaration of worker-topic exchange failed".to_string().red()));
                     
 
                     // Print the space left on the Worker Machine (at the path of the Application Data)
