@@ -1,6 +1,6 @@
 [package]
 name = "bender-worker"
-version = "0.1.2"
+version = "0.1.3"
 license = "MIT"
 readme = "README.md"
 authors = ["David Huss <dh@widerstandzwecklos.at>"]
@@ -16,7 +16,7 @@ assets = [
 ]
 
 [dependencies]
-amqp = { version = "0.1.2", default-features = false }
+amqp = { version = "0.1.3", default-features = false }
 app_dirs = "1.2"
 chrono = { version = "0.4", features = ["serde"] }
 colored = "1.7"
