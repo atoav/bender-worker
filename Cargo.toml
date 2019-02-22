@@ -9,7 +9,7 @@ workspace = ".."
 
 [package.metadata.deb]
 extended-description = "As part of the bender renderfarm, the bender-worker service acts as a client that receives tasks from the qu which are executed. It downloads and stores the needed blendfile from flaskbender and stores the file after rendering"
-depends = "$auto, blender, bender-config"
+depends = "$auto, blender, bender-cli"
 assets = [
     ["target/release/bender-worker", "usr/bin/", "755"],
     ["bender-worker.service", "lib/systemd/system/", "755"]
