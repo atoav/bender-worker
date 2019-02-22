@@ -11,7 +11,7 @@ use std::process::Command;
 
 // Default parameters
 const BENDER_URL: &str = "http://0.0.0.0:5000";
-const DISKLIMIT: u64 =           200*1_000_000;
+const DISKLIMIT: u64 =           (200.0*1e9) as u64;
 const WORKLOAD: usize =          1;
 const GRACE_PERIOD: u64 =        60;
 
@@ -51,7 +51,7 @@ impl WorkerConfig{
             id:             Uuid::new_v4(),          // Random UUID on start, then from disk
             blendpath:      PathBuf::new(),          // Path to where the blendfiles should be stored
             outpath:        PathBuf::new(),          // Path to where the rendered frames should be stored
-            disklimit:      DISKLIMIT,               // In MB
+            disklimit:      DISKLIMIT,               // In GB
             workload:       WORKLOAD,                // How many frames to take at once
             grace_period:   GRACE_PERIOD,            // How many seconds to keep blendfiles around before deletion
             mode:           Mode::Independent        // use server config or not
