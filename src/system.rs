@@ -52,10 +52,10 @@ pub fn print_space_warning<P>(p: P, limit: u64) where P: Into<PathBuf>{
         Ok(space) => {
             let gigabytes = space as f64/1e9;
             let limit = limit as f64 * 1e9;
-            if  gigabytes < limit {
-                redmsg(format!("❗ Warning: Space left on disk:        {:.*} GB (Limit: {:.*} GB)", 4, gigabytes.to_string(), 4, limit.to_string()));
-            }else{
+            if gigabytes < limit {
                 scrnmsg(format!("Space left on disk:                 {:.*} GB (Limit: {:.*} GB)", 4, gigabytes.to_string(), 4, limit.to_string()));
+            }else{
+                redmsg(format!("❗ Warning: Space left on disk:        {:.*} GB (Limit: {:.*} GB)", 4, gigabytes.to_string(), 4, limit.to_string()));
             }
         },
         Err(err) => {

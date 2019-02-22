@@ -20,7 +20,7 @@ impl Work{
     /// 2. whether there is enough space left
     pub fn should_add(&self) -> bool{
         // Return early if ther isn't enough space
-        if system::enough_space(&self.config.outpath, self.config.disklimit){
+        if !system::enough_space(&self.config.outpath, self.config.disklimit){
             eprintln!("{}", " ❗ [WORKER] Warning: Taking no new jobs".to_string().black().on_yellow());
             system::print_space_warning(&self.config.outpath, self.config.disklimit);
             let timeout = Duration::from_secs(5);
