@@ -31,7 +31,7 @@ pub fn enough_space<P>(p: P, limit: u64) -> bool where P: Into<PathBuf>{
         Ok(space) => {
             // println!("Space available: {}", space);
             let gigabytes = space as f64/1e9;
-            let limit = (limit as f64 * 1e9) as u64;
+            let limit = limit as f64 * 1e9;
             gigabytes < limit
         },
         Err(err) => {
@@ -51,7 +51,7 @@ pub fn print_space_warning<P>(p: P, limit: u64) where P: Into<PathBuf>{
     match fs2::available_space(&p){
         Ok(space) => {
             let gigabytes = space as f64/1e9;
-            let limit = (limit as f64 * 1e9) as u64;
+            let limit = limit as f64 * 1e9;
             if  gigabytes < limit {
                 redmsg(format!("❗ Warning: Space left on disk:        {:.*} GB (Limit: {:.*} GB)", 4, gigabytes.to_string(), 4, limit.to_string()));
             }else{
