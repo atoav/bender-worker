@@ -10,7 +10,7 @@ use dialoguer::Input;
 use std::process::Command;
 
 // Default parameters
-const BENDER_URL: &str = "http://0.0.0.0:5000";
+const BENDER_URL: &str = "http://0.0.0.0:8000";
 const DISKLIMIT: u64 =           (200.0*1e9) as u64;
 const WORKLOAD: usize =          1;
 const GRACE_PERIOD: u64 =        60;
@@ -176,7 +176,7 @@ pub fn setup_outpath<P>(config: &mut WorkerConfig, p: P) -> GenResult<()> where 
 
 
 
-/// Figure out if there is a config for the server via command `bender-config path`
+/// Figure out if there is a config for the server via command `bender-cli config path`
 /// and return a working config, either in server mode or in independent mode
 pub fn get_config<P>(p: P, args: &Args) -> GenResult<WorkerConfig> where P: Into<PathBuf>{
     let p = p.into();
@@ -187,7 +187,8 @@ pub fn get_config<P>(p: P, args: &Args) -> GenResult<WorkerConfig> where P: Into
         Ok(c)
     }else{
         // Check if we have a bender-config (this indicates we are on a server)
-        let configpath: Option<String> = match Command::new("bender-config")
+        let configpath: Option<String> = match Command::new("bender-cli")
+                                            .arg("config")
                                             .arg("path")
                                             .output(){
             Ok(out)     =>  Some(String::from_utf8_lossy(&out.stdout).to_string()),
