@@ -1,5 +1,6 @@
 [Unit]
 Description=bender-worker
+User=bender
 
 [Service]
 Type=simple
