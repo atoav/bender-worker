@@ -192,7 +192,10 @@ pub fn get_config<P>(p: P, args: &Args) -> GenResult<WorkerConfig> where P: Into
                                             .arg("path")
                                             .output(){
             Ok(out)     =>  Some(String::from_utf8_lossy(&out.stdout).to_string()),
-            Err(_err)   =>  None
+            Err(err)   =>  {
+                errmsg(format!("There was no server config: {}", err)); 
+                None
+            }
         };
 
         // Try to get a serverconfig if there is one, otherwise get the worker config \
