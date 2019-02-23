@@ -1,6 +1,5 @@
 [Unit]
-Description=bender-worker
-User=bender
+Description=Bender-Renderfarm: Receives Tasks from bender-qu and executes them
 
 [Service]
 Type=simple
