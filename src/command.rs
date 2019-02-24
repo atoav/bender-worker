@@ -112,29 +112,52 @@ pub fn clean(args: &Args) {
 pub fn force_clean(args: &Args, config: &WorkerConfig){
     if !args.cmd_frames || args.cmd_blendfiles {
         let p = config.blendpath.to_string_lossy().to_string();
-        match fs::remove_dir_all(&p){
-            Ok(_) => {
-                println!("{}", format!(" ✔ Deleted the contents of {}", p).green());
-                match fs::create_dir_all(&p){
-                    Ok(_) => (),
-                    Err(err) => eprintln!("{}", format!(" ✖ Error: Couldn't recreate directory: {}", err).red())
+        match fs::read_dir(&p){
+            Ok(entries) => {
+                for entry in entries{
+                    match entry{
+                        Ok(e) => {
+                            let path = e.path();
+                            if path.is_dir(){
+                                match fs::remove_dir_all(&path) {
+                                    Ok(_) => println!("{}", format!(" ✔ Deleted the contents of {}", path.to_string_lossy()).green()),
+                                    Err(err) => eprintln!("{}", format!(" ✖ Error while deleting in {}: {}", path.to_string_lossy(), err).red())
+                                }
+                            }
+                        },
+                        Err(err) => eprintln!("{}", format!(" ✖ Error: Couldn't read: {}", err).red())
+                    }
                 }
             },
-            Err(err) => eprintln!("{}", format!(" ✖ Error while deleting in {}: {}", p, err).red())
+            Err(err) => eprintln!("{}", format!(" ✖ Error: Couldn't read \"{}\": {}", &p, err).red())
         }
     }
 
     if !args.cmd_blendfiles || args.cmd_frames {
         let p = config.outpath.to_string_lossy().to_string();
-        match fs::remove_dir_all(&p){
-            Ok(_) => {
-                println!("{}", format!(" ✔ Deleted the contents of {}", p).green());
-                match fs::create_dir_all(&p){
-                    Ok(_) => (),
-                    Err(err) => eprintln!("{}", format!(" ✖ Error: Couldn't recreate directory: {}", err).red())
+        match fs::read_dir(&p){
+            Ok(entries) => {
+                for entry in entries{
+                    match entry{
+                        Ok(e) => {
+                            let path = e.path();
+                            if path.is_dir(){
+                                match fs::remove_dir_all(&path) {
+                                    Ok(_) => println!("{}", format!(" ✔ Deleted the contents of {}", path.to_string_lossy()).green()),
+                                    Err(err) => eprintln!("{}", format!(" ✖ Error while deleting in {}: {}", path.to_string_lossy(), err).red())
+                                }
+                            }else{
+                                match fs::remove_file(&path) {
+                                    Ok(_) => println!("{}", format!(" ✔ Deleted {}", path.to_string_lossy()).green()),
+                                    Err(err) => eprintln!("{}", format!(" ✖ Error while deleting {}: {}", path.to_string_lossy(), err).red())
+                                }
+                            }
+                        },
+                        Err(err) => eprintln!("{}", format!(" ✖ Error: Couldn't read: {}", err).red())
+                    }
                 }
             },
-            Err(err) => eprintln!("{}", format!(" ✖ Error while deleting in {}: {}", p, err).red())
+            Err(err) => eprintln!("{}", format!(" ✖ Error: Couldn't read \"{}\": {}", &p, err).red())
         }
     }
 }
