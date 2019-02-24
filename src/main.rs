@@ -115,7 +115,7 @@ fn main(){
                             .and_then(|d| d.deserialize())
                             .unwrap_or_else(|e| e.exit());
 
-    let benderserver = env::var("BENDERSERVER").is_err();
+    let benderserver = env::var("BENDERSERVER").is_ok();
 
     // Read the config (if there is one) and get the path for frames
     if args.cmd_get && args.cmd_outpath{
