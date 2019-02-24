@@ -38,6 +38,7 @@ extern crate bender_mq;
 extern crate bender_config;
 
 
+use std::env;
 use std::fs;
 use colored::*;
 use std::process;
@@ -114,6 +115,8 @@ fn main(){
                             .and_then(|d| d.deserialize())
                             .unwrap_or_else(|e| e.exit());
 
+    let benderserver = env::var("BENDERSERVER").is_err();
+
     // Read the config (if there is one) and get the path for frames
     if args.cmd_get && args.cmd_outpath{
         command::outpath(&args);
@@ -130,7 +133,7 @@ fn main(){
     }else if args.cmd_clean{
         command::clean(&args);
     }else{
-        command::run(&args);
+        command::run(&args, benderserver);
     }
 }
 
