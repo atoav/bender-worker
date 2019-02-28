@@ -6,8 +6,7 @@ use config::WorkerConfig;
 use bender_job::{Task, History};
 use bender_mq::BenderMQ;
 use std::collections::HashMap;
-use chrono::Utc;
-use chrono::DateTime;
+use chrono::{Utc, DateTime};
 use work::blendfiles::Blendfile;
 
 
