@@ -37,6 +37,8 @@ pub struct Work{
 
 
 impl Work{
+
+
     /// Create a new task with a given config
     pub fn new(config: WorkerConfig) -> Self{
         Work{
@@ -58,11 +60,11 @@ impl Work{
     }
 
 
-    /// Runs every loop and updates everything. This is the meat of the business\
-    /// logic for the worker.
+    /// Runs every loop and updates everything. This is the meat of the \
+    /// business logic for the worker.
     pub fn update(&mut self, channel: &mut Channel){
-        // Add new tasks only if we don't exceed the number of tasks definied in \
-        // the workload setting
+        // Add new tasks only if we don't exceed the number of tasks definied \
+        // in the workload setting
         if self.should_add(){
             self.get_tasks(channel);
         }
@@ -86,8 +88,8 @@ impl Work{
         }
 
         if self.has_task() && !self.all_jobs_finished() {
-            // Construct Commands for Tasks that have a matching blendfile on disk \
-            // and whoose commands are not constructed yet
+            // Construct Commands for Tasks that have a matching blendfile on \
+            // disk and whose commands are not constructed yet
             self.construct_commands();
 
             // Update who the current Task is ("self.current")
@@ -97,14 +99,13 @@ impl Work{
         // Dispatch a Command for the current Task ("self.current")
         self.run_command(channel);
 
-        // Figure out if a blendfile's tasks are all finished. If so request the\
-        // job status from flaskbender. If the job has finished and a certain grace\
-        // period has passed, delete the blendfile in question
-        // Don't do this when running in server mode
-        if self.has_task() 
-        && !self.all_jobs_finished() 
-        && self.any_job_finished() 
-        && !self.config.mode.is_server(){
+        // Figure out if a blendfile's tasks are all finished. If so request \
+        // a job status from flaskbender. If the job has finished and a \
+        // certain grace period has passed, delete the blendfile in question.
+        // Don't do this when running in server mode, because bender-janitor \
+        // will manage this
+        if self.has_task() && !self.all_jobs_finished()
+        && self.any_job_finished() && !self.config.mode.is_server(){
             self.cleanup_blendfiles();
         }
 
@@ -130,9 +131,6 @@ impl Work{
             }
         }
     }
+
+    
 }
-
-
-
-
-
