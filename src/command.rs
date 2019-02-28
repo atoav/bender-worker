@@ -1,6 +1,7 @@
 use crate::*;
 use config::WorkerConfig;
 use bender_mq::BenderMQ;
+use std::os::unix::fs::PermissionsExt;
 
 
 
@@ -71,10 +72,12 @@ pub fn clean(args: &Args) {
                                     match fs::remove_dir_all(&p){
                                         Ok(_) => {
                                             println!("{}", format!(" ✔ Deleted the contents of {}", p).green());
+
                                             match fs::create_dir_all(&p){
                                                 Ok(_) => (),
                                                 Err(err) => eprintln!("{}", format!(" ✖ Error: Couldn't recreate directory: {}", err).red())
                                             }
+
                                         },
                                         Err(err) => eprintln!("{}", format!(" ✖ Error while deleting in {}: {}", p, err).red())
                                     }
@@ -110,6 +113,7 @@ pub fn clean(args: &Args) {
 
 
 pub fn force_clean(args: &Args, config: &WorkerConfig){
+    // Delete Jobs
     if !args.cmd_frames || args.cmd_blendfiles {
         let p = config.blendpath.to_string_lossy().to_string();
         match fs::read_dir(&p){
@@ -118,6 +122,8 @@ pub fn force_clean(args: &Args, config: &WorkerConfig){
                     match entry{
                         Ok(e) => {
                             let path = e.path();
+                            // Only delete blendfiles/<id> directories don't 
+                            // touch any files there (e.g. for frame counting)
                             if path.is_dir(){
                                 match fs::remove_dir_all(&path) {
                                     Ok(_) => println!("{}", format!(" ✔ Deleted the contents of {}", path.to_string_lossy()).green()),
@@ -132,32 +138,37 @@ pub fn force_clean(args: &Args, config: &WorkerConfig){
             Err(err) => eprintln!("{}", format!(" ✖ Error: Couldn't read \"{}\": {}", &p, err).red())
         }
     }
-
+    // Delete Frames
     if !args.cmd_blendfiles || args.cmd_frames {
-        let p = config.outpath.to_string_lossy().to_string();
-        match fs::read_dir(&p){
-            Ok(entries) => {
-                for entry in entries{
-                    match entry{
-                        Ok(e) => {
-                            let path = e.path();
-                            if path.is_dir(){
-                                match fs::remove_dir_all(&path) {
-                                    Ok(_) => println!("{}", format!(" ✔ Deleted the contents of {}", path.to_string_lossy()).green()),
-                                    Err(err) => eprintln!("{}", format!(" ✖ Error while deleting in {}: {}", path.to_string_lossy(), err).red())
-                                }
-                            }else{
-                                match fs::remove_file(&path) {
-                                    Ok(_) => println!("{}", format!(" ✔ Deleted {}", path.to_string_lossy()).green()),
-                                    Err(err) => eprintln!("{}", format!(" ✖ Error while deleting {}: {}", path.to_string_lossy(), err).red())
-                                }
+        let p = &config.outpath;
+        match fs::metadata(p){
+            Ok(meta) => {
+                // Set the permissions to 775
+                let mut permissions = meta.permissions();
+                permissions.set_mode(0o775);
+                // Remove Frames in the directory
+                match fs::read_dir(&p) {
+                    Ok(entries)  => {
+                        for entry in entries {
+                            match entry {
+                                Ok(e) => {
+                                    let job_frames = e.path();
+                                    match fs::remove_dir_all(&job_frames){
+                                        Ok(()) => println!("{}", format!(" ✔ Deleted Frames at {}", &job_frames.to_string_lossy()).green()),
+                                        Err(err) => eprintln!("{}", format!(" ✖ Error: couldn't delete Frames at {}: {}", &job_frames.to_string_lossy(), err).red())
+                                    }
+                                },
+                                Err(err) => eprintln!("{}", format!(" ✖ Error while reading reading frame directory at {}: {}", p.to_string_lossy(), err).red())
                             }
-                        },
-                        Err(err) => eprintln!("{}", format!(" ✖ Error: Couldn't read: {}", err).red())
+                        }
+
+                    },
+                    Err(err) =>{
+                        eprintln!("{}", format!(" ✖ Error while reading reading frame directory at {}: {}", p.to_string_lossy(), err).red())
                     }
                 }
             },
-            Err(err) => eprintln!("{}", format!(" ✖ Error: Couldn't read \"{}\": {}", &p, err).red())
+            Err(err) => eprintln!("{}", format!(" ✖ Error while reading metadata of file at {}: {}", p.to_string_lossy(), err).red())
         }
     }
 }
