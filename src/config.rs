@@ -10,10 +10,11 @@ use dialoguer::Input;
 use std::process::Command;
 
 // Default parameters
-const BENDER_URL: &str = "http://0.0.0.0:8000";
-const DISKLIMIT: u64 =           (200.0*1e9) as u64;
-const WORKLOAD: usize =          1;
-const GRACE_PERIOD: u64 =        60;
+const BENDER_URL: &str   = "http://0.0.0.0:8000";
+const DISKLIMIT: u64     = (200.0*1e9) as u64;
+const WORKLOAD: usize    = 1;
+const GRACE_PERIOD: u64  = 60;
+const HEART_RATE: isize  = 60;
 
 
 pub type GenError = Box<std::error::Error>;
@@ -30,7 +31,8 @@ pub struct WorkerConfig{
     pub disklimit: u64,
     pub workload: usize,
     pub grace_period: u64,
-    pub mode: Mode
+    pub mode: Mode,
+    pub heart_rate_seconds: isize
 }
 
 
@@ -47,14 +49,24 @@ impl WorkerConfig{
     pub fn new() -> Self{
         // Default for now.
         Self{
-            bender_url:     BENDER_URL.to_string(),  // URL of the bender frontend
-            id:             Uuid::new_v4(),          // Random UUID on start, then from disk
-            blendpath:      PathBuf::new(),          // Path to where the blendfiles should be stored
-            outpath:        PathBuf::new(),          // Path to where the rendered frames should be stored
-            disklimit:      DISKLIMIT,               // In GB
-            workload:       WORKLOAD,                // How many frames to take at once
-            grace_period:   GRACE_PERIOD,            // How many seconds to keep blendfiles around before deletion
-            mode:           Mode::Independent        // use server config or not
+            // URL of the bender frontend
+            bender_url:     BENDER_URL.to_string(),
+            // Random UUID on start, then from disk
+            id:             Uuid::new_v4(),
+            // Path to where the blendfiles should be stored
+            blendpath:      PathBuf::new(),
+            // Path to where the rendered frames should be stored
+            outpath:        PathBuf::new(),
+            // The disklimit in GB - below this don't accept Tasks
+            disklimit:      DISKLIMIT,
+            // How many frames to take at once
+            workload:       WORKLOAD,
+            // How many seconds to keep blendfiles around before deletion
+            grace_period:   GRACE_PERIOD,
+            // use server config or not
+            mode:           Mode::Independent,
+            // How often to send a heart beat at maximum
+            heart_rate_seconds: HEART_RATE
         }
     }
 
@@ -94,14 +106,15 @@ impl WorkerConfig{
     /// WorkerConfig. Fill all missing fields with the default values
     pub fn from_serverconfig(config: bender_config::Config) -> Self{
         Self{
-            bender_url:    BENDER_URL.to_string(),
-            id:            config.worker.id,
-            disklimit:     config.worker.disklimit,
-            grace_period:  config.worker.grace_period,
-            workload:      config.worker.workload,
-            blendpath:     PathBuf::from(config.paths.blend()),
-            outpath:       PathBuf::from(config.paths.frames()),
-            mode:          Mode::Server
+            bender_url:           BENDER_URL.to_string(),
+            id:                   config.worker.id,
+            disklimit:            config.worker.disklimit,
+            grace_period:         config.worker.grace_period,
+            workload:             config.worker.workload,
+            blendpath:            PathBuf::from(config.paths.blend()),
+            outpath:              PathBuf::from(config.paths.frames()),
+            mode:                 Mode::Server,
+            heart_rate_seconds:   config.worker.heart_rate_seconds
         }
     }
 }

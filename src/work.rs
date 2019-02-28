@@ -3,10 +3,11 @@
 
 use ::*;
 use config::WorkerConfig;
-use bender_job::Task;
-use bender_job::History;
+use bender_job::{Task, History};
+use bender_mq::BenderMQ;
 use std::collections::HashMap;
 use chrono::Utc;
+use chrono::DateTime;
 use work::blendfiles::Blendfile;
 
 
@@ -30,13 +31,16 @@ pub struct Work{
     pub blendfiles: HashMap<String, Option<Blendfile>>,
     pub parent_jobs: HashMap<String, String>,
     command: Option<std::process::Child>,
-    display_divider: bool
+    display_divider: bool,
+    last_heartbeat: Option<DateTime<Utc>>
 }
 
 
 
 
 impl Work{
+
+
 
 
     /// Create a new task with a given config
@@ -49,7 +53,8 @@ impl Work{
             blendfiles: HashMap::<String, Option<Blendfile>>::new(),
             parent_jobs: HashMap::<String, String>::new(),
             command: None,
-            display_divider: true
+            display_divider: true,
+            last_heartbeat: None
         }
     }
 
@@ -58,6 +63,8 @@ impl Work{
     pub fn add_history<S>(&mut self, value: S) where S: Into<String> {
         self.history.insert(Utc::now(), value.into());
     }
+
+
 
 
     /// Runs every loop and updates everything. This is the meat of the \
@@ -113,10 +120,15 @@ impl Work{
         if cfg!(debug_assertions) && self.has_task() && !self.all_jobs_finished() {
             self.print_divider();
         }
+
+        self.beat_heart(channel);
     }  
 
 
-    /// Print a horizontal divider if the flag is set and reset the flag afterwards
+
+
+    /// Print a horizontal divider if the flag is set \
+    /// and reset the flag afterwards
     fn print_divider(&mut self) {
         if self.display_divider {
             println!("{}", "-".repeat(width()));
@@ -132,5 +144,31 @@ impl Work{
         }
     }
 
-    
+
+
+
+    /// Send a heartbeat message to bender-worker via rabbitmq as a life sign
+    /// The heartbeat is rate limited and will only beat if the specified has \
+    /// passed
+    fn beat_heart(&mut self, channel: &mut Channel) {
+        // Determine whether the heart should beat
+        let should_beat = match self.last_heartbeat{
+            Some(time) => {
+                let delta = Utc::now() - time;
+                delta > chrono::Duration::seconds(self.config.heart_rate_seconds as i64)
+            },
+            None => true
+        };
+
+        // Update the heartbeat only if there was none in the last n seconds
+        // or it was the first one.
+        if should_beat{
+            let routing_key = format!("heart.{}", self.config.id);
+            channel.worker_post(routing_key, Vec::new());
+            self.last_heartbeat = Some(Utc::now());
+        }
+    }
+
+
+
 }
