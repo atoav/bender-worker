@@ -201,7 +201,6 @@ impl Work{
                             let average = bf.average_duration();
                             println!("{}", format!(" ✔️ [WORKER][{task_id}] Finished task (Duration: {duration}, Average Duration: {average})", 
                                 task_id=&t.id[..6], 
-                                job_id=t.parent_id,
                                 duration=format_duration(duration),
                                 average=format_duration(average)).green(),
                             );
