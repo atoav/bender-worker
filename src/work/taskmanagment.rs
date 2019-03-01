@@ -199,8 +199,8 @@ impl Work{
                             bf.increment_frame();
                             let duration = bf.last_frame_duration().unwrap();
                             let average = bf.average_duration();
-                            println!("{}", format!(" ✔️ [WORKER] Finished task [{task_id}] for job [{job_id}] (Duration: {duration}, Average Duration: {average})", 
-                                task_id=t.id, 
+                            println!("{}", format!(" ✔️ [WORKER][{task_id}] Finished task (Duration: {duration}, Average Duration: {average})", 
+                                task_id=&t.id[..6], 
                                 job_id=t.parent_id,
                                 duration=format_duration(duration),
                                 average=format_duration(average)).green(),
@@ -230,7 +230,7 @@ impl Work{
             t.error();
             self.tasks.push(t.clone());
             moved = true;
-            eprintln!("{}", format!(" ✖ [WORKER] Errored task [{}] for job [{}]: {}", &t.id[..6], t.parent_id, err).red());
+            eprintln!("{}", format!(" ✖ [WORKER][{}] Errored task for job [{}]: {}", &t.id[..6], t.parent_id, err).red());
             let routing_key = format!("error.{}", self.config.id);
             match t.serialize_to_u8(){
                 Ok(task_json) => channel.worker_post(routing_key, task_json),
