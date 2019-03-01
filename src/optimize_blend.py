@@ -101,9 +101,7 @@ if n_textures_removed > 0: history[now()] = "optimize_blend.py: Removed "+str(n_
 
 
 # Overwrite the file
-bpy.ops.wm.save_as_mainfile(filepath=bpy.data.filepath)
-bpy.ops.wm.open_mainfile(filepath=bpy.data.filepath)
-bpy.ops.wm.save_as_mainfile(filepath=bpy.data.filepath)
+bpy.ops.wm.save_as_mainfile(filepath=bpy.data.filepath, copy=True)
 history[now()] = "optimize_blend.py: Stored changes in file at "+bpy.data.filepath
 
 
