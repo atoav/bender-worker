@@ -3,6 +3,8 @@
 //! is toml. The config will be stored at the path returned by the app_dirs crate.
 //! On Linux this should be `~/.config/Bender-Worker/config.toml`
 use ::*;
+use main::*;
+use main::APP_INFO;
 use std::error::Error;
 use std::fs;
 use std::io::Read;
@@ -17,7 +19,7 @@ const GRACE_PERIOD: u64  = 60;
 const HEART_RATE: isize  = 60;
 
 
-pub type GenError = Box<std::error::Error>;
+pub type GenError = Box<dyn std::error::Error>;
 pub type GenResult<T> = Result<T, GenError>;
 
 
