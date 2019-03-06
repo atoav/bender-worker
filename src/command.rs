@@ -1,4 +1,6 @@
 use crate::*;
+use main::*;
+use main::APP_INFO;
 use config::WorkerConfig;
 use bender_mq::BenderMQ;
 use std::os::unix::fs::PermissionsExt;

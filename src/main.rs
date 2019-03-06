@@ -19,7 +19,7 @@
 
 use ::*;
 
-const APP_INFO: AppInfo = AppInfo{name: "Bender-Worker", author: "David Huss"};
+pub const APP_INFO: AppInfo = AppInfo{name: "Bender-Worker", author: "David Huss"};
 
 const USAGE: &str = "
 bender-worker
@@ -52,17 +52,17 @@ Options:
 
 #[derive(Debug, Deserialize)]
 pub struct Args {
-    flag_configure: bool,
-    flag_independent: bool,
-    cmd_get: bool,
-    cmd_outpath: bool,
-    cmd_blendpath: bool,
-    cmd_benderurl: bool,
-    cmd_id: bool,
-    cmd_clean: bool,
-    cmd_blendfiles: bool,
-    cmd_frames: bool,
-    flag_force: bool,
+    pub flag_configure: bool,
+    pub flag_independent: bool,
+    pub cmd_get: bool,
+    pub cmd_outpath: bool,
+    pub cmd_blendpath: bool,
+    pub cmd_benderurl: bool,
+    pub cmd_id: bool,
+    pub cmd_clean: bool,
+    pub cmd_blendfiles: bool,
+    pub cmd_frames: bool,
+    pub flag_force: bool,
 }
 
 
