@@ -99,7 +99,7 @@ pub struct Args {
 }
 
 
-mod command;
+
 
 
 fn main(){
