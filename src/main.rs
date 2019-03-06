@@ -16,20 +16,7 @@
 //! 7. Inbetween all these steps the Task gets transmitted to bender-bookkeeper for housekeeping
 //! 
 use crate::*;
-use work::*;
-use std::env;
-use std::fs;
-use colored::*;
-use std::process;
-use std::path::{PathBuf, Path};
-use app_dirs::*;
-use uuid::Uuid;
-use docopt::Docopt;
-use serde_derive::{Serialize, Deserialize};
-use dialoguer::Confirmation;
-use console::Term;
 
-use bender_mq::Channel;
 
 const APP_INFO: AppInfo = AppInfo{name: "Bender-Worker", author: "David Huss"};
 
