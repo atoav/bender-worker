@@ -16,8 +16,8 @@
 //! 7. Inbetween all these steps the Task gets transmitted to bender-bookkeeper for housekeeping
 //! 
 
-
-use ::*;
+extern crate bender_worker;
+use bender_worker::*;
 
 pub const APP_INFO: AppInfo = AppInfo{name: "Bender-Worker", author: "David Huss"};
 
