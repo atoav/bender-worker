@@ -36,7 +36,7 @@ extern crate bender_job;
 extern crate bender_mq;
 extern crate bender_config;
 
-
+use crate::*;
 use std::env;
 use std::fs;
 use colored::*;
@@ -50,13 +50,6 @@ use dialoguer::Confirmation;
 use console::Term;
 
 use bender_mq::Channel;
-
-
-pub mod system;
-
-pub mod config;
-
-pub mod work;
 use work::*;
 
 const APP_INFO: AppInfo = AppInfo{name: "Bender-Worker", author: "David Huss"};
