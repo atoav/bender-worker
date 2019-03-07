@@ -108,12 +108,15 @@ history[now()] = "optimize_blend.py: Stored changes in file at "+bpy.data.filepa
 
 # Save Status into dict
 status = {
-    "path": bpy.data.filepath,
-    "renderer": renderer,
-    "cuda": cuda,
-    "device": scene.cycles.device,
-    "image_format": image_format,
     "valid_format": valid_format,
+    "path": bpy.data.filepath,
+    "render":{
+        "renderer": renderer,
+        "cuda": cuda,
+        "device": scene.cycles.device,
+        "image_format": image_format,
+        "uses_compositing": scene.render.use_compositing,
+    },
     "materials": {
         "n": n_materials,
         "removed": n_materials_removed
@@ -130,15 +133,14 @@ status = {
         "start": scene.frame_start,
         "end": scene.frame_end,
         "current": scene.frame_current,
-        "step": scene.frame_step
+        "step": scene.frame_step,
+        "fps": scene.render.fps
     },
     "resolution": {
         "x": scene.render.resolution_x,
         "y": scene.render.resolution_y,
         "scale": scene.render.resolution_percentage
     },
-    "fps": scene.render.fps,
-    "uses_compositing": scene.render.use_compositing,
     "history": history
 }
 
