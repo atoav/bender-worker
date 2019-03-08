@@ -5,6 +5,8 @@ Description=Bender-Renderfarm: Receives Tasks from bender-qu and executes them
 Type=simple
 User=bender-worker
 Group=bender
+Restart=always
+RestartSec=3
 Environment=BENDERSERVER=1
 ExecStart=/usr/bin/bender-worker
 
