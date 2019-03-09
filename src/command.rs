@@ -1,8 +1,13 @@
 use crate::*;
 use config::WorkerConfig;
 use bender_mq::BenderMQ;
+use std::fs::DirBuilder;
+
+#[cfg(target_os = "linux")]
 use std::os::unix::fs::PermissionsExt;
 
+#[cfg(target_os = "linux")]
+use std::os::unix::fs::DirBuilderExt;
 
 
 
@@ -73,11 +78,17 @@ pub fn clean(args: &Args) {
                                         Ok(_) => {
                                             println!("{}", format!(" ✔ Deleted the contents of {}", p).green());
 
-                                            match fs::create_dir_all(&p){
-                                                Ok(_) => (),
-                                                Err(err) => eprintln!("{}", format!(" ✖ Error: Couldn't recreate directory: {}", err).red())
-                                            }
+                                            // Create frames directory with 775 permissions on Unix
+                                            let mut builder = DirBuilder::new();
 
+                                            if !cfg!(windows){
+                                                // Set the permissions to 775
+                                                builder.mode(0o2775);
+                                            }
+                                            match builder.recursive(true).create(&p){
+                                                Ok(_) => println!("Recreated directory {} with permission 2775", &*p),
+                                                Err(err) => eprintln!(" ✖ [WORKER] Error: Couldn't recreate Directory {}", err)
+                                            } 
                                         },
                                         Err(err) => eprintln!("{}", format!(" ✖ Error while deleting in {}: {}", p, err).red())
                                     }
@@ -91,10 +102,18 @@ pub fn clean(args: &Args) {
                                     match fs::remove_dir_all(&p){
                                         Ok(_) => {
                                             println!("{}", format!(" ✔ Deleted the contents of {}", p).green());
-                                            match fs::create_dir_all(&p){
-                                                Ok(_) => (),
-                                                Err(err) => eprintln!("{}", format!(" ✖ Error: Couldn't recreate directory: {}", err).red())
+
+                                            // Create frames directory with 775 permissions on Unix
+                                            let mut builder = DirBuilder::new();
+
+                                            if !cfg!(windows){
+                                                // Set the permissions to 775
+                                                builder.mode(0o2775);
                                             }
+                                            match builder.recursive(true).create(&p){
+                                                Ok(_) => println!("Recreated directory {} with permission 2775", &*p),
+                                                Err(err) => eprintln!(" ✖ [WORKER] Error: Couldn't recreate Directory {}", err)
+                                            } 
                                         },
                                         Err(err) => eprintln!("{}", format!(" ✖ Error while deleting in {}: {}", p, err).red())
                                     }
@@ -143,9 +162,11 @@ pub fn force_clean(args: &Args, config: &WorkerConfig){
         let p = &config.outpath;
         match fs::metadata(p){
             Ok(meta) => {
-                // Set the permissions to 775
-                let mut permissions = meta.permissions();
-                permissions.set_mode(0o775);
+                if !cfg!(windows){
+                    // Set the permissions to 775
+                    let mut permissions = meta.permissions();
+                    permissions.set_mode(0o775);
+                }
                 // Remove Frames in the directory
                 match fs::read_dir(&p) {
                     Ok(entries)  => {

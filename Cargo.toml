@@ -36,6 +36,7 @@ shlex = "0.1"
 toml = "0.4"
 uuid = { version = "0.7", features = ["serde", "v4"] }
 reqwest = "0.9"
+users = "0.8"
 
 bender_job = { git = "ssh://git@code.hfbk.net:4242/bendercode/bender-job.git" }
 bender_mq  = { git = "ssh://git@code.hfbk.net:4242/bendercode/bender-mq.git" }

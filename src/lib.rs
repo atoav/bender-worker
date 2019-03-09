@@ -32,6 +32,7 @@ extern crate docopt;
 extern crate colored;
 extern crate console;
 extern crate reqwest;
+extern crate users;
 
 extern crate bender_job;
 extern crate bender_mq;

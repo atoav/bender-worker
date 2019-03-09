@@ -8,6 +8,10 @@ use std::fs;
 use std::io::Read;
 use dialoguer::Input;
 use std::process::Command;
+use std::fs::DirBuilder;
+
+#[cfg(target_os = "linux")]
+use std::os::unix::fs::DirBuilderExt;
 
 // Default parameters
 const BENDER_URL: &str   = "http://0.0.0.0:8000";
@@ -160,7 +164,15 @@ pub fn setup_blendpath<P>(config: &mut WorkerConfig, p: P) -> GenResult<()> wher
 
     config.blendpath = PathBuf::from(blendpath);
 
-    fs::create_dir_all(&config.blendpath)?;
+    // Create frames directory with 775 permissions on Unix
+    let mut builder = DirBuilder::new();
+
+    if !cfg!(windows){
+        // Set the permissions to 775
+        builder.mode(0o2775);
+    }
+    builder.recursive(true)
+           .create(&config.blendpath)?;
 
     Ok(())
 }
@@ -182,7 +194,15 @@ pub fn setup_outpath<P>(config: &mut WorkerConfig, p: P) -> GenResult<()> where 
 
     config.outpath = PathBuf::from(outpath);
 
-    fs::create_dir_all(&config.outpath)?;
+    // Create frames directory with 775 permissions on Unix
+    let mut builder = DirBuilder::new();
+
+    if !cfg!(windows){
+        // Set the permissions to 775
+        builder.mode(0o2775);
+    }
+    builder.recursive(true)
+           .create(&config.outpath)?;
 
     Ok(())
 }
@@ -256,6 +276,7 @@ pub fn get_worker_config<P>(p: P, args: &Args) -> GenResult<WorkerConfig> where 
         }
         // Create directories on the way
         fs::create_dir_all(&d)?;
+
         // Get a new config
         let mut config = WorkerConfig::new();
         // Ask the user where to save blendfilesfiles

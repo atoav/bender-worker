@@ -7,7 +7,12 @@ use std::process::{Stdio};
 use std::io::{BufRead, BufReader};
 use std::process::Command;
 use std::time::Duration;
-// use console::{Term, measure_text_width};
+use users::{Groups, UsersCache};
+use std::fs::DirBuilder;
+
+#[cfg(target_os = "linux")]
+use std::os::unix::fs::DirBuilderExt;
+
 
 
 
@@ -32,10 +37,22 @@ impl Work{
                 let mut out = self.config.outpath.clone();
                 out.push(task.parent_id.as_str());
                 if !out.exists(){
-                    match fs::create_dir(&out){
-                        Ok(_) => (),
-                        Err(err) => eprintln!(" ✖ [WORKER] Error: Couldn't create Directory {}", err)
-                    }  
+                    // Create frames directory with 775 permissions on Unix
+                    let mut builder = DirBuilder::new();
+
+                    if !cfg!(windows){
+                        // Set the permissions to 775
+                        match builder.mode(0o2775).recursive(true).create(&out){
+                            Ok(_) => println!("Created directory {} with permission 2775", &out.to_string_lossy()),
+                            Err(err) => eprintln!(" ✖ [WORKER] Error: Couldn't create Directory {}", err)
+                        } 
+                    } else {
+                        // Set the permissions to 775
+                        match builder.recursive(true).create(&out){
+                            Ok(_) => println!("Created directory {}", &out.to_string_lossy()),
+                            Err(err) => eprintln!(" ✖ [WORKER] Error: Couldn't create Directory {}", err)
+                        } 
+                    }
                 }
                 if out.exists(){
                     let outstr = out.to_string_lossy().to_string();
@@ -66,19 +83,44 @@ impl Work{
                     let s = task.command.to_string().unwrap().replacen("blender ", "", 1);
                     match shlex::split(&s){
                         Some(args) => {
-                            match Command::new("blender")
-                                                   .args(args.clone())
-                                                   .stdout(Stdio::piped())
-                                                   .stderr(Stdio::piped())
-                                                   .spawn(){
-                                Ok(c) => {
-                                    println!(" ⚟ [WORKER][{}] Dispatched Command: \"blender {}\"", &task.id[..6], args.join(" "));
-                                    self.command = Some(c);
-                                    
-                                    ExitStatus::Running
-                                },
-                                Err(err) => ExitStatus::Errored(
-                                    format!(" ✖ [WORKER] Error: Couldn't spawn Command with args: {:?}. Error was: {}", args, err))
+                            // If we are in server mode assume we run linux and set the output spawn
+                            // with gid "bender"
+                            if self.config.mode.is_server() && !cfg!(windows){
+                                use std::os::unix::process::CommandExt;
+                                // Get bender gid when we are on a server
+                                let mut cache = UsersCache::new();
+                                let group = cache.get_group_by_name("bender").expect("There is no group called 'bender' please create the requeired users and groups!");
+
+                                match Command::new("blender")
+                                                       .args(args.clone())
+                                                       .gid(group.gid())
+                                                       .stdout(Stdio::piped())
+                                                       .stderr(Stdio::piped())
+                                                       .spawn(){
+                                    Ok(c) => {
+                                        println!(" ⚟ [WORKER][{}] Dispatched Command: \"blender {}\"", &task.id[..6], args.join(" "));
+                                        self.command = Some(c);
+                                        
+                                        ExitStatus::Running
+                                    },
+                                    Err(err) => ExitStatus::Errored(
+                                        format!(" ✖ [WORKER] Error: Couldn't spawn Command with args: {:?}. Error was: {}", args, err))
+                                }
+                            }else{
+                                match Command::new("blender")
+                                                       .args(args.clone())
+                                                       .stdout(Stdio::piped())
+                                                       .stderr(Stdio::piped())
+                                                       .spawn(){
+                                    Ok(c) => {
+                                        println!(" ⚟ [WORKER][{}] Dispatched Command: \"blender {}\"", &task.id[..6], args.join(" "));
+                                        self.command = Some(c);
+                                        
+                                        ExitStatus::Running
+                                    },
+                                    Err(err) => ExitStatus::Errored(
+                                        format!(" ✖ [WORKER] Error: Couldn't spawn Command with args: {:?}. Error was: {}", args, err))
+                                }
                             }
                         },
                         None => ExitStatus::Errored(format!(" ✖ [WORKER] Error: Couldn't split arguments for command: {:?}", task.command))
