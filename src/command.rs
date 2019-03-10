@@ -11,127 +11,188 @@ use std::os::unix::fs::DirBuilderExt;
 
 
 
+
+/// Return the path to the place where the rendered frames will be stored
 pub fn outpath(args: &Args){
-    match get_app_dir(AppDataType::UserConfig, &APP_INFO, ""){
-        Err(err) => eprintln!("{}", format!(" ✖ Error: {}", err).red()),
-        Ok(app_savepath) => {
-            match config::get_config(&app_savepath, &args){
+    match get_paths(){
+        (Some(a), Some(b)) => {
+            match config::get_config(a, b, &args){
                 Ok(config) => println!("{}", config.outpath.to_string_lossy()),
                 Err(err) => eprintln!("{}", format!(" ✖ Error: {}", err).red())
             }
-        }
+        },
+        (None, None) => {
+            match config::get_config(PathBuf::from(""), PathBuf::from(""), &args){
+                Ok(config) => println!("{}", config.outpath.to_string_lossy()),
+                Err(err) => eprintln!("{}", format!(" ✖ Error: {}", err).red())
+            }
+        },
+        (_, _) => panic!("This shouldn't have happened. This was meant to be an unreachable arm!")
     }
 }
 
+
+
+/// Return the path to the place where the blendfiles will be stored
 pub fn blendpath(args: &Args){
-    match get_app_dir(AppDataType::UserConfig, &APP_INFO, ""){
-        Err(_err) => (), // Couldn't get app_savepath
-        Ok(app_savepath) => {
-            match config::get_config(&app_savepath, &args){
+    match get_paths(){
+        (Some(a), Some(b)) => {
+            match config::get_config(a, b, &args){
                 Ok(config) => println!("{}", config.blendpath.to_string_lossy()),
                 Err(err) => eprintln!("{}", format!(" ✖ Error: {}", err).red())
             }
-        }
+        },
+        (None, None) => {
+            match config::get_config(PathBuf::from(""), PathBuf::from(""), &args){
+                Ok(config) => println!("{}", config.blendpath.to_string_lossy()),
+                Err(err) => eprintln!("{}", format!(" ✖ Error: {}", err).red())
+            }
+        },
+        (_, _) => panic!("This shouldn't have happened. This was meant to be an unreachable arm!")
     }
 }
 
 
-pub fn id(args: &Args) {
-    match get_app_dir(AppDataType::UserConfig, &APP_INFO, ""){
-        Err(_err) => (), // Couldn't get app_savepath
-        Ok(app_savepath) => {
-            match config::get_config(&app_savepath, &args){
+
+
+/// Return the workers id
+pub fn id(args: &Args){
+    match get_paths(){
+        (Some(a), Some(b)) => {
+            match config::get_config(a, b, &args){
                 Ok(config) => println!("{}", config.id),
                 Err(err) => eprintln!("{}", format!(" ✖ Error: {}", err).red())
             }
-        }
+        },
+        (None, None) => {
+            match config::get_config(PathBuf::from(""), PathBuf::from(""), &args){
+                Ok(config) => println!("{}", config.id),
+                Err(err) => eprintln!("{}", format!(" ✖ Error: {}", err).red())
+            }
+        },
+        (_, _) => panic!("This shouldn't have happened. This was meant to be an unreachable arm!")
     }
 }
 
-pub fn benderurl(args: &Args) {
-    match get_app_dir(AppDataType::UserConfig, &APP_INFO, ""){
-        Err(_err) => (), // Couldn't get app_savepath
-        Ok(app_savepath) => {
-            match config::get_config(&app_savepath, &args){
+
+
+/// Return the URL of bender
+pub fn benderurl(args: &Args){
+    match get_paths(){
+        (Some(a), Some(b)) => {
+            match config::get_config(a, b, &args){
                 Ok(config) => println!("{}", config.bender_url),
                 Err(err) => eprintln!("{}", format!(" ✖ Error: {}", err).red())
             }
+        },
+        (None, None) => {
+            match config::get_config(PathBuf::from(""), PathBuf::from(""), &args){
+                Ok(config) => println!("{}", config.bender_url),
+                Err(err) => eprintln!("{}", format!(" ✖ Error: {}", err).red())
+            }
+        },
+        (_, _) => panic!("This shouldn't have happened. This was meant to be an unreachable arm!")
+    }
+}
+
+
+
+
+/// Delete the workers files (runs either clean_gentle() or clean_force())
+pub fn clean(args: &Args){
+    match get_paths(){
+        (Some(a), Some(b)) => {
+            match config::get_config(&a, &b, &args){
+                Ok(config) => {
+                    if args.flag_force{
+                        clean_force(args, &config);
+                    } else {
+                        clean_gentle(args, &config);
+                    }
+                },
+                Err(err) => {eprintln!("{}", format!("Error: there was no config.toml at {path}: {err}", 
+                        path=&a.to_string_lossy(),
+                        err=err).red())}
+            }
+        },
+        (None, None) => {
+            match config::get_config(PathBuf::from(""), PathBuf::from(""), &args){
+                Ok(config) => {
+                    if args.flag_force{
+                        clean_force(args, &config);
+                    } else {
+                        clean_gentle(args, &config);
+                    }
+                },
+                Err(err) => {
+                    eprintln!("{}", format!("Error: : {err}", 
+                        err=err).red())
+                }
+            }
+        },
+        (_, _) => panic!("This shouldn't have happened. This was meant to be an unreachable arm!")
+    }
+}
+
+
+
+/// Subcommand to delete all of the workers file witrh confirmation if there is a config
+pub fn clean_gentle(args: &Args, config: &WorkerConfig) {
+    if !args.cmd_frames || args.cmd_blendfiles {
+        let p = config.blendpath.to_string_lossy().to_string();
+        let msg = format!("{}", format!("Delete all files at {} ?", p).on_bright_red());
+        if Confirmation::new().with_text(&msg).interact().unwrap(){
+            match fs::remove_dir_all(&p){
+                Ok(_) => {
+                    println!("{}", format!(" ✔ Deleted the contents of {}", p).green());
+
+                    // Create frames directory with 775 permissions on Unix
+                    let mut builder = DirBuilder::new();
+
+                    if !cfg!(windows){
+                        // Set the permissions to 775
+                        builder.mode(0o2775);
+                    }
+                    match builder.recursive(true).create(&p){
+                        Ok(_) => println!("Recreated directory {} with permission 2775", &*p),
+                        Err(err) => eprintln!(" ✖ [WORKER] Error: Couldn't recreate Directory {}", err)
+                    } 
+                },
+                Err(err) => eprintln!("{}", format!(" ✖ Error while deleting in {}: {}", p, err).red())
+            }
+        }
+    }
+
+    if !args.cmd_blendfiles || args.cmd_frames {
+        let p = config.outpath.to_string_lossy().to_string();
+        let msg = format!("{}", format!("Delete all files at {} ?", p).on_bright_red());
+        if Confirmation::new().with_text(&msg).interact().unwrap(){
+            match fs::remove_dir_all(&p){
+                Ok(_) => {
+                    println!("{}", format!(" ✔ Deleted the contents of {}", p).green());
+
+                    // Create frames directory with 775 permissions on Unix
+                    let mut builder = DirBuilder::new();
+
+                    if !cfg!(windows){
+                        // Set the permissions to 775
+                        builder.mode(0o2775);
+                    }
+                    match builder.recursive(true).create(&p){
+                        Ok(_) => println!("Recreated directory {} with permission 2775", &*p),
+                        Err(err) => eprintln!(" ✖ [WORKER] Error: Couldn't recreate Directory {}", err)
+                    } 
+                },
+                Err(err) => eprintln!("{}", format!(" ✖ Error while deleting in {}: {}", p, err).red())
+            }
         }
     }
 }
 
 
-pub fn clean(args: &Args) {
-    match get_app_dir(AppDataType::UserConfig, &APP_INFO, ""){
-            Err(_err) => (), // Couldn't get app_savepath
-            Ok(app_savepath) => {
-                match config::get_config(&app_savepath, &args){
-                    Ok(config) => {
-                        if args.flag_force{
-                            force_clean(&args, &config);
-                        }else{
-                            if !args.cmd_frames || args.cmd_blendfiles {
-                                let p = config.blendpath.to_string_lossy().to_string();
-                                let msg = format!("{}", format!("Delete all files at {} ?", p).on_bright_red());
-                                if Confirmation::new().with_text(&msg).interact().unwrap(){
-                                    match fs::remove_dir_all(&p){
-                                        Ok(_) => {
-                                            println!("{}", format!(" ✔ Deleted the contents of {}", p).green());
 
-                                            // Create frames directory with 775 permissions on Unix
-                                            let mut builder = DirBuilder::new();
-
-                                            if !cfg!(windows){
-                                                // Set the permissions to 775
-                                                builder.mode(0o2775);
-                                            }
-                                            match builder.recursive(true).create(&p){
-                                                Ok(_) => println!("Recreated directory {} with permission 2775", &*p),
-                                                Err(err) => eprintln!(" ✖ [WORKER] Error: Couldn't recreate Directory {}", err)
-                                            } 
-                                        },
-                                        Err(err) => eprintln!("{}", format!(" ✖ Error while deleting in {}: {}", p, err).red())
-                                    }
-                                }
-                            }
-
-                            if !args.cmd_blendfiles || args.cmd_frames {
-                                let p = config.outpath.to_string_lossy().to_string();
-                                let msg = format!("{}", format!("Delete all files at {} ?", p).on_bright_red());
-                                if Confirmation::new().with_text(&msg).interact().unwrap(){
-                                    match fs::remove_dir_all(&p){
-                                        Ok(_) => {
-                                            println!("{}", format!(" ✔ Deleted the contents of {}", p).green());
-
-                                            // Create frames directory with 775 permissions on Unix
-                                            let mut builder = DirBuilder::new();
-
-                                            if !cfg!(windows){
-                                                // Set the permissions to 775
-                                                builder.mode(0o2775);
-                                            }
-                                            match builder.recursive(true).create(&p){
-                                                Ok(_) => println!("Recreated directory {} with permission 2775", &*p),
-                                                Err(err) => eprintln!(" ✖ [WORKER] Error: Couldn't recreate Directory {}", err)
-                                            } 
-                                        },
-                                        Err(err) => eprintln!("{}", format!(" ✖ Error while deleting in {}: {}", p, err).red())
-                                    }
-                                }
-                            }
-                            
-                        }
-                    },
-                    Err(err) => eprintln!("{}", format!("Error: there was no config.toml at {path}: {err}", 
-                        path=&app_savepath.to_string_lossy(),
-                        err=err).red())
-                }
-            }
-        }
-}
-
-
-pub fn force_clean(args: &Args, config: &WorkerConfig){
+/// Subcommand to delete all of the workers files by force (if there is a config)
+pub fn clean_force(args: &Args, config: &WorkerConfig){
     // Delete Jobs
     if !args.cmd_frames || args.cmd_blendfiles {
         let p = config.blendpath.to_string_lossy().to_string();
@@ -196,30 +257,74 @@ pub fn force_clean(args: &Args, config: &WorkerConfig){
 
 
 
-pub fn run(args: &Args, benderserver: bool) {
-    // Get a valid application save path depending on the OS
-    scrnmsg(format!("\n{x} BENDER-WORKER {x}", x="=".repeat((width()-15)/2)));
-    match (get_app_dir(AppDataType::UserConfig, &APP_INFO, ""), benderserver){
-        (Err(err), false) => errmsg(format!("Couldn't get application folder: {}", err)),
-        (Ok(app_savepath), false) => {
+/// Get the paths to the configuration file and the user cache
+pub fn get_paths() -> (Option<PathBuf>, Option<PathBuf>){
+    let on_server = env::var("BENDERSERVER").is_ok();
+
+    // Get a configpath for the application
+    let app_configpath = match (get_app_dir(AppDataType::UserConfig, &APP_INFO, "/"), on_server){
+        (Err(err), false) => {
+            errmsg(format!("Couldn't find a suitable configuration folder for bender-worker: {}", err));
+            std::process::exit(1);
+        },
+        (Ok(app_configpath), false) => {
             // Run this branch if the BENDERSERVER environment variable isn't set
-            run_worker(args, &app_savepath);
+            Some(app_configpath)
         },
         (_, true) => {
             // Run this branch if the BENDERSERVER environment variable is set
             // which means we are running as a systemd service
-            run_worker(args, &PathBuf::new());
+            None
         }
-        
-    }
+    };
+
+    // Get a cache path for the application
+    let app_cachepath = match (get_app_dir(AppDataType::UserCache, &APP_INFO, "/"), on_server){
+        (Err(err), false) => {
+            errmsg(format!("Couldn't find a suitable cache folder for bender-worker: {}", err));
+            std::process::exit(1);
+        },
+        (Ok(app_cachepath), false) => {
+            // Run this branch if the BENDERSERVER environment variable isn't set
+            Some(app_cachepath)
+        },
+        (_, true) => {
+            // Run this branch if the BENDERSERVER environment variable is set
+            // which means we are running as a systemd service
+            None
+        }
+    };
+
+    (app_configpath, app_cachepath)
+
 }
 
 
 
+/// Initialize the worker
+pub fn run(args: &Args) {
+    // Get a valid application save path depending on the OS
+    scrnmsg(format!("\n{x} BENDER-WORKER {x}", x="=".repeat((width()-15)/2)));
 
-pub fn run_worker(args: &Args, app_savepath: &PathBuf){
+    if !system::blender_in_path(){
+        errmsg("Found no 'blender' command in the PATH. Make sure it is installed and in PATH environment variable".to_string());
+        process::exit(1);
+    }
+    
+    match get_paths(){
+        (Some(a), Some(b)) => run_worker(args, a, b),
+        (None, None) => run_worker(args, PathBuf::from(""), PathBuf::from("")),
+        (_, _) => panic!("This shouldn't have happened. This was meant to be an unreachable arm!")
+    }
+    
+}
+
+
+
+/// The program logic with loop etc.
+pub fn run_worker(args: &Args, app_configpath: PathBuf, app_cachepath: PathBuf){
     // Load the configuration (or generate one if we are a first timer)
-    match config::get_config(app_savepath, &args){
+    match config::get_config(&app_configpath, &app_cachepath, &args){
         Err(err) => {
             let e = format!("{}", err);
             if !e.contains("missing field"){
@@ -228,7 +333,7 @@ pub fn run_worker(args: &Args, app_savepath: &PathBuf){
                 errmsg(format!("The existing configuration misses a field: {}", err));
                 let msg = "Do you want to generate a new one? (this overrides the existing configuration)".on_red();
                 if Confirmation::new().with_text(&msg).interact().unwrap(){
-                    let mut p = PathBuf::from(&app_savepath);
+                    let mut p = PathBuf::from(&app_configpath);
                     p.push("config.toml");
                     fs::remove_file(&p).unwrap_or_else(|_| panic!("Error: Couldn't remove the file at {}\nPlease try to remove it manually", p.to_string_lossy()));
                     println!("{}", "Deleted the configuration file. Run worker again for a fresh new start".on_green());
@@ -236,14 +341,9 @@ pub fn run_worker(args: &Args, app_savepath: &PathBuf){
             }
         },
         Ok(config) => {
-            if !system::blender_in_path(){
-                errmsg("Found no 'blender' command in the PATH. Make sure it is installed and in PATH environment variable".to_string());
-                process::exit(1);
-            }
-
             if !config.outpath.exists(){
-                let mut configpath = app_savepath.clone();
-            configpath.push("config.toml");
+                let mut configpath = app_configpath.clone();
+                configpath.push("config.toml");
                 errmsg(format!("the path specified as output path in {} does not exist or is not writeable!", configpath.to_string_lossy()));
                 println!("Please either create the path at {} or modify the config with bender-worker --configure", 
                     config.outpath.to_string_lossy() );

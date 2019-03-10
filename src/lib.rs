@@ -63,7 +63,7 @@ use work::*;
 
 pub mod command;
 
-pub const APP_INFO: AppInfo = AppInfo{name: "Bender-Worker", author: "David Huss"};
+pub const APP_INFO: AppInfo = AppInfo{name: "bender-worker", author: "David Huss"};
 
 pub const USAGE: &str = "
 bender-worker
@@ -74,7 +74,7 @@ via http GET, renders the Tasks and stores the rendered Frames on disk.
 
 Usage:
   bender-worker
-  bender-worker --configure [--local]
+  bender-worker --configure [--independent]
   bender-worker --independent
   bender-worker clean [--force]
   bender-worker clean blendfiles [--force]
@@ -117,7 +117,6 @@ pub fn run_main(){
                             .and_then(|d| d.deserialize())
                             .unwrap_or_else(|e| e.exit());
 
-    let benderserver = env::var("BENDERSERVER").is_ok();
 
     // Read the config (if there is one) and get the path for frames
     if args.cmd_get && args.cmd_outpath{
@@ -135,7 +134,7 @@ pub fn run_main(){
     }else if args.cmd_clean{
         command::clean(&args);
     }else{
-        command::run(&args, benderserver);
+        command::run(&args);
     }
 }
 

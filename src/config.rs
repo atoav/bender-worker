@@ -15,7 +15,7 @@ use std::os::unix::fs::DirBuilderExt;
 
 // Default parameters
 const BENDER_URL: &str   = "http://0.0.0.0:8000";
-const DISKLIMIT: u64     = (200.0*1e9) as u64;
+const DISKLIMIT: u64     = 2;
 const WORKLOAD: usize    = 1;
 const GRACE_PERIOD: u64  = 60;
 const HEART_RATE: isize  = 60;
@@ -211,12 +211,15 @@ pub fn setup_outpath<P>(config: &mut WorkerConfig, p: P) -> GenResult<()> where 
 
 /// Figure out if there is a config for the server via command `bender-cli config path`
 /// and return a working config, either in server mode or in independent mode
-pub fn get_config<P>(p: P, args: &Args) -> GenResult<WorkerConfig> where P: Into<PathBuf>{
-    let p = p.into();
+pub fn get_config<P>(app_configpath: P, app_cachepath: P, args: &Args) -> GenResult<WorkerConfig> where P: Into<PathBuf>{
+    let on_server = env::var("BENDERSERVER").is_ok();
+
+    let app_configpath = app_configpath.into();
+    let app_cachepath = app_cachepath.into();
     // If there is a --independent or -i flag, immidiately return the local config
-    if args.flag_independent{
-        scrnmsg(format!("Running in Independent Mode. Using the config at {}", p.to_string_lossy()));
-        let c = get_worker_config(p, args)?;
+    if args.flag_independent || !on_server{
+        scrnmsg(format!("Running in Independent Mode. Using the config at {}", app_configpath.to_string_lossy()));
+        let c = get_worker_config(app_configpath, app_cachepath, args)?;
         Ok(c)
     }else{
         // Check if we have a bender-config (this indicates we are on a server)
@@ -242,15 +245,15 @@ pub fn get_config<P>(p: P, args: &Args) -> GenResult<WorkerConfig> where P: Into
                     },
                     Err(err)   => {
                         errmsg(format!("Failed to read bender's config.toml from {}: {}", path.trim().bold(), err));
-                        notemsg(format!("Attempting to use Workers own config at {} as a fallback", p.to_string_lossy().bold()));
-                        let c = get_worker_config(p, args)?;
+                        notemsg(format!("Attempting to use Workers own config at {} as a fallback", app_configpath.to_string_lossy().bold()));
+                        let c = get_worker_config(app_configpath, app_cachepath, args)?;
                         Ok(c)
                     }
                 }
             },
             None       => {
-                scrnmsg(format!("Running in Independent Mode. Using the config at {}", p.to_string_lossy()));
-                let c = get_worker_config(p, args)?;
+                scrnmsg(format!("Running in Independent Mode. Using the config at {}", app_configpath.to_string_lossy()));
+                let c = get_worker_config(app_configpath, app_cachepath, args)?;
                 Ok(c)
             }
         }
@@ -259,37 +262,37 @@ pub fn get_config<P>(p: P, args: &Args) -> GenResult<WorkerConfig> where P: Into
 
 /// Try to read the WorkerConfig from the config folder or generate one if it doesn't\
 /// exist and write it to disk
-pub fn get_worker_config<P>(p: P, args: &Args) -> GenResult<WorkerConfig> where P: Into<PathBuf>{
-    let mut p = p.into();
-    let d = p.clone();
-    p.push("config.toml");
-    if Path::new(&p).exists() && !args.flag_configure {
-        okmsg(format!("Reading the Configuration from:     {}", p.to_string_lossy().bold()));
+pub fn get_worker_config<P>(app_configpath: P, app_cachepath: P, args: &Args) -> GenResult<WorkerConfig> where P: Into<PathBuf>{
+    let mut app_configpath = app_configpath.into();
+    let app_cachepath = app_cachepath.into();
+    app_configpath.push("config.toml");
+    if Path::new(&app_configpath).exists() && !args.flag_configure {
+        // okmsg(format!("Reading the Configuration from:     {}", app_configpath.to_string_lossy().bold()));
         // Deserialize it from file
-        let config = WorkerConfig::from_file(&p)?;
+        let config = WorkerConfig::from_file(&app_configpath)?;
         Ok(config)
     } else {
         // No WorkerConfig on disk. Create a new one and attempt to write it there
         if !args.flag_configure{
-            notemsg(format!("No Configuration found at \"{}\"", p.to_string_lossy()));
+            notemsg(format!("No Configuration found at \"{}\"", app_configpath.to_string_lossy()));
             notemsg("Generating a new one".to_string());
         }
         // Create directories on the way
-        fs::create_dir_all(&d)?;
+        fs::create_dir_all(&app_cachepath)?;
 
         // Get a new config
         let mut config = WorkerConfig::new();
         // Ask the user where to save blendfilesfiles
-        while let Err(e) = setup_blendpath(&mut config, &d){
+        while let Err(e) = setup_blendpath(&mut config, &app_cachepath){
             errmsg(format!("This is not a valid directory: {}", e));
         }
         // Ask the user where to save the rendered Frames
-        while let Err(e) = setup_outpath(&mut config, &d){
+        while let Err(e) = setup_outpath(&mut config, &app_cachepath){
             errmsg(format!("This is not a valid directory: {}", e));
         }
 
         // Write it to file
-        config.to_file(p.to_string_lossy())?;
+        config.to_file(app_configpath.to_string_lossy())?;
         Ok(config)
     }
 }
