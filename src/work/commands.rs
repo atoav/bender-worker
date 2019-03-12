@@ -7,6 +7,7 @@ use std::process::{Stdio};
 use std::io::{BufRead, BufReader};
 use std::process::Command;
 use std::time::Duration;
+use bender_job::frames::FrameMap;
 use users::{Groups, UsersCache};
 use std::fs::DirBuilder;
 
@@ -23,49 +24,51 @@ use std::os::unix::fs::DirBuilderExt;
 impl Work{
     // Construct the commands
     pub fn construct_commands(&mut self){
-        // copy the data of tasks
-        let mut data = std::mem::replace(&mut self.tasks, vec![]);
-        // mutate over it
-        data.iter_mut()
-            .filter(|task| task.is_queued())
-            .filter(|task| !task.command.is_constructed())
-            .filter(|task| task.data.contains_key("blendfile"))
-               .for_each(|task|{
-                // we can unwrap this because, the key "blendfile" only exists
-                   // if there is a value
-                let p = &task.data["blendfile"].clone();
-                let mut out = self.config.outpath.clone();
-                out.push(task.parent_id.as_str());
-                if !out.exists(){
-                    // Create frames directory with 775 permissions on Unix
-                    let mut builder = DirBuilder::new();
+        if self.has_task() && !self.all_jobs_finished() {
+            // copy the data of tasks
+            let mut data = std::mem::replace(&mut self.tasks, vec![]);
+            // mutate over it
+            data.iter_mut()
+                .filter(|task| task.is_queued())
+                .filter(|task| !task.command.is_constructed())
+                .filter(|task| task.data.contains_key("blendfile"))
+                   .for_each(|task|{
+                    // we can unwrap this because, the key "blendfile" only exists
+                       // if there is a value
+                    let p = &task.data["blendfile"].clone();
+                    let mut out = self.config.outpath.clone();
+                    out.push(task.parent_id.as_str());
+                    if !out.exists(){
+                        // Create frames directory with 775 permissions on Unix
+                        let mut builder = DirBuilder::new();
 
-                    if !cfg!(windows){
-                        // Set the permissions to 775
-                        match builder.mode(0o2775).recursive(true).create(&out){
-                            Ok(_) => println!("Created directory {} with permission 2775", &out.to_string_lossy()),
-                            Err(err) => eprintln!(" ✖ [WORKER] Error: Couldn't create Directory {}", err)
-                        } 
-                    } else {
-                        // Set the permissions to 775
-                        match builder.recursive(true).create(&out){
-                            Ok(_) => println!("Created directory {}", &out.to_string_lossy()),
-                            Err(err) => eprintln!(" ✖ [WORKER] Error: Couldn't create Directory {}", err)
-                        } 
+                        if !cfg!(windows){
+                            // Set the permissions to 775
+                            match builder.mode(0o2775).recursive(true).create(&out){
+                                Ok(_) => println!("Created directory {} with permission 2775", &out.to_string_lossy()),
+                                Err(err) => eprintln!(" ✖ [WORKER] Error: Couldn't create Directory {}", err)
+                            } 
+                        } else {
+                            // Set the permissions to 775
+                            match builder.recursive(true).create(&out){
+                                Ok(_) => println!("Created directory {}", &out.to_string_lossy()),
+                                Err(err) => eprintln!(" ✖ [WORKER] Error: Couldn't create Directory {}", err)
+                            } 
+                        }
                     }
-                }
-                if out.exists(){
-                    let outstr = out.to_string_lossy().to_string();
-                    task.construct(p.clone(), outstr.clone());
-                    self.display_divider = true;
-                    match task.command{
-                        bender_job::Command::Blender(ref c) => println!(" ✚ [WORKER][{}] Constructed task for frame [{}]", &task.id[..6], c.frame),
-                        _ => println!(" ✚ [WORKER] Constructed generic task [{}]", task.id)
+                    if out.exists(){
+                        let outstr = out.to_string_lossy().to_string();
+                        task.construct(p.clone(), outstr.clone());
+                        self.display_divider = true;
+                        match task.command{
+                            bender_job::Command::Blender(ref c) => println!(" ✚ [WORKER][{}] Constructed task for frame [{}]", &task.id[..6], c.frame.to_string()),
+                            _ => println!(" ✚ [WORKER] Constructed generic task [{}]", task.id)
+                        }
                     }
-                }
-            });
-        // put it pack
-        std::mem::replace(&mut self.tasks, data);
+                });
+            // put it pack
+            std::mem::replace(&mut self.tasks, data);
+        }
     }
 
 

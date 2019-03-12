@@ -43,44 +43,46 @@ impl Work{
     /// Reject these messages if our system is not fit to do work
     /// Acknowledge messages that are wonky
     pub fn get_tasks(&mut self, channel: &mut Channel){
-        let mut remaining_delivery_tags = Vec::<u64>::new();
+        if self.should_add(){
+            let mut remaining_delivery_tags = Vec::<u64>::new();
 
-        // Get the next task from the work queue
-        channel.basic_get("work", false)
-               .take(1)
-               .for_each(|message|{
-                    match Task::deserialize_from_u8(&message.body){
-                        Ok(mut t) => {
-                            
-                            // Add Delivery tag to task data for later acknowledgement
-                            t.add_data("task-delivery-tag", message.reply.delivery_tag.to_string().as_str());
-                            
-                            // Add this as a event to the tasks history
-                            let h = format!("[WORKER] Task arrived at Worker [{}] with delivery tag {}", self.config.id, &t.data["task-delivery-tag"]);
-                            self.add_history(h.as_str());
-                            
-                            // Set the status of the task to queued
-                            t.queue();
+            // Get the next task from the work queue
+            channel.basic_get("work", false)
+                   .take(1)
+                   .for_each(|message|{
+                        match Task::deserialize_from_u8(&message.body){
+                            Ok(mut t) => {
+                                
+                                // Add Delivery tag to task data for later acknowledgement
+                                t.add_data("task-delivery-tag", message.reply.delivery_tag.to_string().as_str());
+                                
+                                // Add this as a event to the tasks history
+                                let h = format!("[WORKER] Task arrived at Worker [{}] with delivery tag {}", self.config.id, &t.data["task-delivery-tag"]);
+                                self.add_history(h.as_str());
+                                
+                                // Set the status of the task to queued
+                                t.queue();
 
-                            println!(" ✚ [WORKER][{id}] Received Task for {short}", 
-                                id=&t.id[..6],
-                                short=t.command.short());
-                            // Add the newly modified Task to the queue
-                            self.tasks.push(t);
-                        },
-                        Err(err) => {
-                            eprintln!("{}", format!(" ✖ [WORKER] Error: Couldn't deserialize Task from message.body: {}", err).red());
-                            // Always try to acknowledge received messages that couldn't be decoded
-                            remaining_delivery_tags.push(message.reply.delivery_tag);
+                                println!(" ✚ [WORKER][{id}] Received Task for {short}", 
+                                    id=&t.id[..6],
+                                    short=t.command.short());
+                                // Add the newly modified Task to the queue
+                                self.tasks.push(t);
+                            },
+                            Err(err) => {
+                                eprintln!("{}", format!(" ✖ [WORKER] Error: Couldn't deserialize Task from message.body: {}", err).red());
+                                // Always try to acknowledge received messages that couldn't be decoded
+                                remaining_delivery_tags.push(message.reply.delivery_tag);
+                            }
                         }
-                    }
-                });
+                    });
 
-        // Acknowledge all remaining wonky messages, that had their deserialization failed
-        // to avoid the accumulation of garbage in the queue
-        for tag in remaining_delivery_tags.iter(){
-            if let Err(err) = channel.basic_ack(*tag, false){
-                eprintln!("{}", format!(" ✖ [WORKER] Error: acknowledgment failed for received message: {}", err).red());
+            // Acknowledge all remaining wonky messages, that had their deserialization failed
+            // to avoid the accumulation of garbage in the queue
+            for tag in remaining_delivery_tags.iter(){
+                if let Err(err) = channel.basic_ack(*tag, false){
+                    eprintln!("{}", format!(" ✖ [WORKER] Error: acknowledgment failed for received message: {}", err).red());
+                }
             }
         }
     }
@@ -117,50 +119,52 @@ impl Work{
     /// Only works on tasks with a constructed Command
     /// Sets the Tasks Status to Running
     pub fn select_next_task(&mut self, channel: &mut Channel){
-        // Only do this if there is no current task running
-        if self.current.is_none() && self.has_task() {
-            let mut i = 0;
-            let mut next = None;
-            // Find the first task that:
-            // - has a blendfile
-            // - has a constructed command
-            // - is queued
-            // then remove this Task from the list and tore it in next
-            while i < self.tasks.len() {
-                if self.has_blendfile(&self.tasks[i]) &&
-                    self.tasks[i].command.is_constructed() &&
-                    (self.tasks[i].is_queued() || self.tasks[i].is_running()) &&
-                    next.is_none() {
-                        // println!("SELECTED TASK [{}]", &self.tasks[i].id);
-                        next = Some(self.tasks.remove(i));
-                } else {
-                        i += 1;
-                        if i < self.tasks.len() {
-                            // println!("SELECTION for {}", &self.tasks[i].id);
-                            // println!("              has_blendfile:  {}", self.has_blendfile(&self.tasks[i]));
-                            // println!("              is_constructed: {}", self.tasks[i].command.is_constructed());
-                            // println!("              is_queued:      {}", self.tasks[i].is_queued());
-                            // println!("              next.is_none:   {}\n", next.is_none());
-                        }
+        if self.has_task() && !self.all_jobs_finished() {
+            // Only do this if there is no current task running
+            if self.current.is_none(){
+                let mut i = 0;
+                let mut next = None;
+                // Find the first task that:
+                // - has a blendfile
+                // - has a constructed command
+                // - is queued
+                // then remove this Task from the list and tore it in next
+                while i < self.tasks.len() {
+                    if self.has_blendfile(&self.tasks[i]) &&
+                        self.tasks[i].command.is_constructed() &&
+                        (self.tasks[i].is_queued() || self.tasks[i].is_running()) &&
+                        next.is_none() {
+                            // println!("SELECTED TASK [{}]", &self.tasks[i].id);
+                            next = Some(self.tasks.remove(i));
+                    } else {
+                            i += 1;
+                            if i < self.tasks.len() {
+                                // println!("SELECTION for {}", &self.tasks[i].id);
+                                // println!("              has_blendfile:  {}", self.has_blendfile(&self.tasks[i]));
+                                // println!("              is_constructed: {}", self.tasks[i].command.is_constructed());
+                                // println!("              is_queued:      {}", self.tasks[i].is_queued());
+                                // println!("              next.is_none:   {}\n", next.is_none());
+                            }
+                    }
                 }
-            }
 
-            // Match the result of above find operation and assign it to
-            // self.current only if there is an actual Task
-            if let Some(mut t) = next {
-                t.start();
-                println!(" ✚ [WORKER][{}] Queued task for job [{}]", &t.id[..6], t.parent_id);
-                self.display_divider = true;
-                let routing_key = format!("start.{}", self.config.id);
-                match t.serialize_to_u8(){
-                    Ok(task_json) => channel.worker_post(routing_key, task_json),
-                    Err(err) => eprintln!(" ✖ [WORKER] Error: Failed ot deserialize Task {}: {}", t.id, err)
+                // Match the result of above find operation and assign it to
+                // self.current only if there is an actual Task
+                if let Some(mut t) = next {
+                    t.start();
+                    println!(" ✚ [WORKER][{}] Queued task for job [{}]", &t.id[..6], t.parent_id);
+                    self.display_divider = true;
+                    let routing_key = format!("start.{}", self.config.id);
+                    match t.serialize_to_u8(){
+                        Ok(task_json) => channel.worker_post(routing_key, task_json),
+                        Err(err) => eprintln!(" ✖ [WORKER] Error: Failed ot deserialize Task {}: {}", t.id, err)
+                    }
+                    
+                    self.current = Some(t);
                 }
-                
-                self.current = Some(t);
+            }else{
+                 //println!("Debug: didn't get a new task because the old is running");
             }
-        }else{
-             //println!("Debug: didn't get a new task because the old is running");
         }
     }
 

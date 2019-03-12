@@ -24,6 +24,16 @@ use bender_job::{Status, Task, Job};
 
 impl Work{
 
+    /// Update each unique parent_job.status for all the Tasks, depending on
+    /// the mode. If there are no Tasks, do nothing
+    pub fn update_parent_job_status(&mut self){
+        if self.has_task() && self.config.mode.is_independent() {
+            self.fetch_parent_jobs_stati();
+        }else if self.config.mode.is_server(){
+            self.read_parent_jobs_stati();
+        }
+    }
+
     /// Update the parent Jobs status via request
     pub fn fetch_parent_jobs_stati(&mut self) {
         // Clear the hashmap
@@ -108,87 +118,112 @@ impl Work{
 
     /// Delete finished blendfiles that are done and overdue
     pub fn cleanup_blendfiles(&mut self) {
-        // Collect all Blendfile IDs that have all their tasks finished.
-        let potentially_finished: Vec<String> = 
-        self.blendfiles.iter()
-                        .filter(|(_, b)|b.is_some())
-                        .filter(|(job_id, _)|{
-                            // Filter out jobs with unfinished jobs
-                            self.get_tasks_for_parent_id(job_id.as_str()).iter()
-                                                                 .all(|t|{
-                                                                    t.is_ended()
-                                                                 })
-                        })
-                        .filter(|(_, entry)|{
+        if self.has_task() && !self.all_jobs_finished()
+            && self.any_job_finished() && !self.config.mode.is_server(){
+            // Collect all Blendfile IDs that have all their tasks finished.
+            let potentially_finished: Vec<String> = 
+            self.blendfiles.iter()
+                            .filter(|(_, b)|b.is_some())
+                            // Filter out jobs with unfinished Tasks
+                            .filter(|(job_id, _)|{
+                                self.get_tasks_for_parent_id(job_id.as_str())
+                                    .iter()
+                                    .all(|t|{
+                                        t.is_ended()
+                                    })
+                            })
                             // Filter out jobs that are still within the grace period
-                            match entry{
-                                Some(bf) => bf.is_over_grace_period(std::time::Duration::from_secs(self.config.grace_period)),
-                                None => false
-                            }
-                            
+                            .filter(|(_, entry)|{
+                                match entry{
+                                    Some(bf) => bf.is_over_grace_period(std::time::Duration::from_secs(self.config.grace_period)),
+                                    None => false
+                                }
+                                
+                            })
+                            // Filter out jobs with unhashed/not uploaded frames
+                            //TODO
+                            .map(|(id, _)| id.clone())
+                            .collect();
+
+            // Check if the parent_job is finished
+            let shall_finish: Vec<String> = potentially_finished.iter()
+                                                   .cloned()
+                                                   .filter(|id|{
+                                                        self.job_is_finished(id.as_str())
+                                                   })
+                                                   .collect();
+
+            // Remove tasks that are contained in finished blendfiles
+            self.tasks.retain(|ref task| shall_finish.contains(&task.parent_id));
+
+            // Transform the ids into  a tuple with ids and paths
+            let shall_finish: Vec<(String, PathBuf)> =
+            shall_finish.iter()
+                        .map(|id| {
+                            let id = id.clone();
+                            let p = self.blendfiles.get_mut(id.as_str()).cloned();
+                            let p = p.unwrap().unwrap().path;
+                            (id, p)
                         })
-                        .map(|(id, _)| id.clone())
                         .collect();
 
-        // Check if 
-        let shall_finish: Vec<String> = potentially_finished.iter()
-                                               .cloned()
-                                               .filter(|id|{
-                                                    self.job_is_finished(id.as_str())
-                                               })
-                                               .collect();
-
-        // Remove tasks that are contained in finished blendfiles
-        self.tasks.retain(|ref task| shall_finish.contains(&task.parent_id));
-
-        // Transform the ids into  a tuple with ids and paths
-        let shall_finish: Vec<(String, PathBuf)> =
-        shall_finish.iter()
-                    .map(|id| {
-                        let id = id.clone();
-                        let p = self.blendfiles.get_mut(id.as_str()).cloned();
-                        let p = p.unwrap().unwrap().path;
-                        (id, p)
-                    })
-                    .collect();
-
-        // Actually go and delete the blendfiles and erase them from self.blendfiles
-        shall_finish.iter()
-                    .map(|(id, path)|{
-                        let erase: bool = 
-                        if path.exists() {
-                            match fs::remove_file(&path){
-                                Ok(_) => {
-                                    okrun(format!("Deleted blendfile for finished job [{}]", id));
-                                    true
-                                },
-                                Err(err) => {
-                                    errrun(format!("Couldn't delete blendfile for finished job ({}): {}", path.to_string_lossy(), err));
-                                    false
+            // Actually go and delete the blendfiles and erase them from self.blendfiles
+            shall_finish.iter()
+                        .map(|(id, path)|{
+                            let erase: bool = 
+                            if path.exists() {
+                                match fs::remove_file(&path){
+                                    Ok(_) => {
+                                        okrun(format!("Deleted blendfile for finished job [{}]", id));
+                                        true
+                                    },
+                                    Err(err) => {
+                                        errrun(format!("Couldn't delete blendfile for finished job ({}): {}", path.to_string_lossy(), err));
+                                        false
+                                    }
                                 }
-                            }
-                        } else {
-                             okrun(format!("ಠ_ಠ Tried to delete blendfile for finished job at {}, but it was already gone... that is okay I guess..", path.to_string_lossy()));
-                             true
-                        };
-                        (id, erase)
-                    })
-                    .filter(|&(_, erase)| erase)
-                    .for_each(|(id, _)| {
-                        let _ = self.blendfiles.remove(id.as_str());
-                        okrun(format!("Forgot blendfile for [{}]", id));
-                    } );
+                            } else {
+                                 okrun(format!("ಠ_ಠ Tried to delete blendfile for finished job at {}, but it was already gone... that is okay I guess..", path.to_string_lossy()));
+                                 true
+                            };
+                            (id, erase)
+                        })
+                        .filter(|&(_, erase)| erase)
+                        .for_each(|(id, _)| {
+                            let _ = self.blendfiles.remove(id.as_str());
+                            okrun(format!("Forgot blendfile for [{}]", id));
+                        } );
+        }
+    }
+
+    /// Get all blendfiles that are currently not there. If multiple Tasks
+    /// share a blendfile, only get it once.
+    pub fn get_blendfiles(&mut self){
+        if self.has_task() || !self.tasks.iter().all(|t| t.is_ended()){
+            // Get a unique list from the tasks job ids, ignoring job IDs that are 
+            // present as keys for the HashMap self.blendfiles already
+            let ids: Vec<String> = self.unique_parent_ids()
+                                       .filter(|&id| !self.has_blendfile_by_id(id))
+                                       .map(|id| id.to_owned())
+                                       .collect();
+
+            // Get the blendfiles in these unique ids depending on the mode
+            if self.config.mode.is_independent() {
+                self.fetch_blendfiles(ids);
+            }else{
+                self.read_blendfiles(ids);
+            }
+
+            // Add the paths of our downloaded blendfiles to the respective 
+            // Tasks for our convenience
+            self.add_paths_to_tasks();
+        }
     }
 
     /// Deals with reqeusting new blendfiles from flaskbender, inserts the paths
     /// into self.blendfiles
-    pub fn fetch_blendfiles(&mut self){
-        // Get a unique list from the tasks job ids, ignoring job IDs that are 
-        // present as keys for the HashMap self.blendfiles already
-        let ids: Vec<String> = self.unique_parent_ids()
-                                   .filter(|&id| !self.has_blendfile_by_id(id))
-                                   .map(|id| id.to_owned())
-                                   .collect();
+    pub fn fetch_blendfiles(&mut self, ids: Vec<String>){
+        
 
         // Only dispatch a request if we have something to reqeust
         if !ids.is_empty(){ 
@@ -215,14 +250,7 @@ impl Work{
 
     /// Deals with reading new blendfiles from disk, inserts the results into
     /// self.blendfiles
-    pub fn read_blendfiles(&mut self){
-        // Get a unique list from the tasks job ids, ignoring job IDs that are 
-        // present as keys for the HashMap self.blendfiles already
-        let ids: Vec<String> = self.unique_parent_ids()
-                                   .filter(|&id| !self.has_blendfile_by_id(id))
-                                   .map(|id| id.to_owned())
-                                   .collect();
-
+    pub fn read_blendfiles(&mut self, ids: Vec<String>){
         // Only read if there are jobs to be read
         if !ids.is_empty(){ 
             // For each remaining ID find a blendfile and insert the resulting path
