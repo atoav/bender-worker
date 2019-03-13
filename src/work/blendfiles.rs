@@ -244,7 +244,6 @@ impl Work{
         // been downloaded 
         if ids.len() == self.blendfiles.iter().map(|(_,x)| x).filter(|e|e.is_some()).count(){
             okrun("Downloaded all blendfiles");
-            self.display_divider = true;
         }
     }
 
@@ -289,7 +288,6 @@ impl Work{
         // been read 
         if ids.len() == self.blendfiles.iter().map(|(_,x)| x).filter(|e|e.is_some()).count(){
             okrun("Read all blendfiles");
-            self.display_divider = true;
         }
     }
 

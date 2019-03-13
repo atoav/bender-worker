@@ -59,7 +59,6 @@ impl Work{
                     if out.exists(){
                         let outstr = out.to_string_lossy().to_string();
                         task.construct(p.clone(), outstr.clone());
-                        self.display_divider = true;
                         match task.command{
                             bender_job::Command::Blender(ref c) => println!(" ✚ [WORKER][{}] Constructed task for frame [{}]", &task.id[..6], c.frame.to_string()),
                             _ => println!(" ✚ [WORKER] Constructed generic task [{}]", task.id)

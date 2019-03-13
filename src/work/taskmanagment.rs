@@ -15,6 +15,7 @@ use work::blendfiles::format_duration;
 
 
 impl Work{
+    
     /// Returns true if a new task should be added. This depends on two factors:
     /// 1. the workload that self has set in the config
     /// 2. whether there is enough space left
@@ -153,7 +154,6 @@ impl Work{
                 if let Some(mut t) = next {
                     t.start();
                     println!(" ✚ [WORKER][{}] Queued task for job [{}]", &t.id[..6], t.parent_id);
-                    self.display_divider = true;
                     let routing_key = format!("start.{}", self.config.id);
                     match t.serialize_to_u8(){
                         Ok(task_json) => channel.worker_post(routing_key, task_json),
@@ -208,7 +208,6 @@ impl Work{
                                 duration=format_duration(duration),
                                 average=format_duration(average)).green(),
                             );
-                            self.display_divider = true;
                         },
                         None => eprintln!("{}", format!(" ✖ [WORKER] Error: Couldn't find Job with ID {} in self.blendfiles... This must be a bug!", t.parent_id).red())
                     }

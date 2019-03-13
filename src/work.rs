@@ -30,7 +30,6 @@ pub struct Work{
     pub blendfiles: HashMap<String, Option<Blendfile>>,
     pub parent_jobs: HashMap<String, String>,
     command: Option<std::process::Child>,
-    display_divider: bool,
     last_heartbeat: Option<DateTime<Utc>>
 }
 
@@ -52,7 +51,6 @@ impl Work{
             blendfiles: HashMap::<String, Option<Blendfile>>::new(),
             parent_jobs: HashMap::<String, String>::new(),
             command: None,
-            display_divider: true,
             last_heartbeat: None
         }
     }
