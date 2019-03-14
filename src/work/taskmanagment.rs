@@ -7,7 +7,7 @@ use ::*;
 use std::thread::sleep;
 use std::time::Duration;
 use amqp::Basic;
-use bender_job::Task;
+use bender_job::{Task, Command, FrameMap};
 use bender_mq::BenderMQ;
 use work::blendfiles::format_duration;
 
@@ -168,6 +168,160 @@ impl Work{
         }
     }
 
+    /// Get Filesizes and generate hashes for every rendered frame.
+    pub fn stat_finished(&mut self, channel: &mut Channel){
+        if self.has_task(){
+            // Set filesize for frames without it
+            self.tasks.iter_mut()
+                      .filter(|task|task.is_finished())
+                      .filter(|task|{
+                        // Filter out any task whose command isn't a blender \
+                        // command and whose frames have no filesize yet 
+                        match task.command.all_filesize(){
+                            Ok(bol)  => !bol,
+                            Err(err) => { errrun(format!("{}", err)); false }
+                        }
+                      })
+                      .for_each(|task| {
+                        if let Command::Blender(ref mut blender_command)  = task.command{
+                            match blender_command.get_frame_filesizes(){
+                                Ok(_)    => (),
+                                Err(err) => errrun(format!("Couldn't get Filesize for Frame: {}", err))
+                            }
+                        }
+                      });
+
+            // Generate hash for frames without it
+            self.tasks.iter_mut()
+                      .filter(|task|task.is_finished())
+                      .filter(|task|{
+                        // Filter out any task whose command isn't a blender \
+                        // command and whose frames have not been hashed yet 
+                        match task.command.all_hashed(){
+                            Ok(bol)  => !bol,
+                            Err(err) => { errrun(format!("{}", err)); false }
+                        }
+                      })
+                      .for_each(|task| {
+                        if let Command::Blender(ref mut blender_command)  = task.command{
+                            match blender_command.get_frame_hashes(){
+                                Ok(_)    => (),
+                                Err(err) => errrun(format!("Couldn't get Filesize for Frame: {}", err))
+                            }
+                        }
+                      });
+
+            self.tasks.iter()
+                      .filter(|task|task.is_finished())
+                      .filter(|task|{
+                        // Filter out any task whose command isn't a blender \
+                        // command and whose frames have not been hashed yet 
+                        match task.command.all_hashed(){
+                            Ok(bol)  => bol,
+                            Err(err) => { errrun(format!("{}", err)); false }
+                        }
+                      })
+                      .filter(|task|{
+                        // Filter out any task whose command isn't a blender \
+                        // command and whose frames have no filesize yet 
+                        match task.command.all_filesize(){
+                            Ok(bol)  => bol,
+                            Err(err) => { errrun(format!("{}", err)); false }
+                        }
+                      })
+                      .for_each(|task|{
+                        // Post the updated Task Info
+                        let routing_key = format!("stat.{}", self.config.id);
+                        match task.serialize_to_u8(){
+                            Ok(task_json) => channel.worker_post(routing_key, task_json),
+                            Err(err) => eprintln!(" ✖ [WORKER] Error: Failed ot deserialize Task {}: {}", task.id, err)
+                        }
+                      })
+        }
+    }
+
+    /// Get Filesizes and generate hashes for every rendered frame.
+    pub fn upload_finished(&mut self, channel: &mut Channel){
+        if self.has_task(){
+            // Split the borrow
+            let Self{ tasks, last_upload, ..} = self;
+            if last_upload.should_run(){
+
+                let worker_id = self.config.id;
+                let mode_is_independent = self.config.mode.is_independent();
+                let bender_url = self.config.bender_url.clone();
+
+                tasks.iter_mut()
+                          .filter(|task|task.is_finished())
+                          .filter(|task|{
+                            // Filter out any task whose command isn't a blender \
+                            // command and whose frames have not been hashed yet 
+                            match task.command.all_hashed(){
+                                Ok(bol)  => bol,
+                                Err(err) => { errrun(format!("{}", err)); false }
+                            }
+                          })
+                          .filter(|task|{
+                            // Filter out any task whose command isn't a blender \
+                            // command and whose frames have no filesize yet 
+                            match task.command.all_filesize(){
+                                Ok(bol)  => bol,
+                                Err(err) => { errrun(format!("{}", err)); false }
+                            }
+                          })
+                          .filter(|task|{
+                            // Filter out any task which has been uploaded
+                            if let Command::Blender(ref b) = task.command{
+                                !b.frame.all_uploaded()
+                            }else{
+                                false
+                            }
+                          })
+                          .for_each(|task|{
+                                
+                                if mode_is_independent{
+                                    let mut url = bender_url.clone();
+                                    url = url+"/job/"+&*task.parent_id.clone()+"/"+&*task.id.clone();
+                                    println!("    Requesting {}", url);
+                                    match task.command.post_frames(url){
+                                        Ok(mut responses) => {
+                                            if responses[0].status().is_success(){
+                                                okrun(format!("Server responded with: {:#?}", responses[0].text()
+                                                                                                           .unwrap_or_else(|_| "Couldn't descramble response".to_string())));
+                                                if let Command::Blender(ref mut b) = task.command{
+                                                    b.set_all_uploaded().unwrap();
+                                                }
+                                                last_upload.set_last()
+                                            }else{
+                                                last_upload.set_last_failed();
+                                                errrun(format!("Server responded with: {:#?}", responses[0].text()
+                                                                                                           .unwrap_or_else(|_| "Couldn't descramble response".to_string())));
+                                            }
+                                        },
+                                        Err(err) => {
+                                            last_upload.set_last_failed();
+                                            errrun(format!("Couldn't post_frames failed with Error: {}", err))
+                                        }
+                                    }
+                                }else{
+                                    // Set uploaded right away if on server
+                                    if let Command::Blender(ref mut b) = task.command{
+                                        b.set_all_uploaded().unwrap();
+                                    }
+                                    last_upload.set_last();
+                                }
+
+                                // Post the updated Task Info
+                                let routing_key = format!("stat.{}", worker_id);
+                                match task.serialize_to_u8(){
+                                    Ok(task_json) => channel.worker_post(routing_key, task_json),
+                                    Err(err) => eprintln!(" ✖ [WORKER] Error: Failed ot deserialize Task {}: {}", task.id, err)
+                                }
+                          });
+
+            }
+        }
+    }
 
     /// finish the current task and push it back to tasks
     pub fn finish_current(&mut self, channel: &mut Channel){

@@ -9,7 +9,7 @@ use std::fs::File;
 use hyper::{Client, Body};
 use hyper::http::Request;
 use hyper::rt::{self, Future, Stream};
-use reqwest::header::USER_AGENT;
+use reqwest::{header::USER_AGENT};
 
 
 pub type GenError = Box<std::error::Error>;
@@ -119,26 +119,6 @@ impl Work {
     }
 
 
-    // pub fn post_frame(&self, task: &Task) -> GenResult<Vec<String>>{
-    //     let mut v = Vec:new();
-    //     match task.command{
-    //         Command::Blender(blender_command) => {
-    //             let renderpaths = blender_command.renderpaths();
-    //             for renderpath in renderpaths{
-    //                 let file = fs::File::open(&*renderpath)?;
-    //                 let client = reqwest::Client::new();
-    //                 println!(" @ [WORKER] Uploading frame from {}", &*renderpath);
-    //                 let res = client.post()
-    //                     .header(USER_AGENT, "bender-worker")
-    //                     .body(file)
-    //                     .send()?
-    //                     .text()?;
-    //                 v.push(res);
-    //             }
-    //             Ok(v)
-    //         },
-    //         _ => Err(From::from("The Command was not a blender command"))
-    //     }
-    // }
+    
 
 }

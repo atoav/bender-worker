@@ -15,6 +15,9 @@ pub mod commands;
 pub mod blendfiles;
 pub mod requests;
 pub mod taskmanagment;
+pub mod ratelimit;
+
+use ratelimit::RateLimiter;
 
 
 
@@ -30,14 +33,15 @@ pub struct Work{
     pub blendfiles: HashMap<String, Option<Blendfile>>,
     pub parent_jobs: HashMap<String, String>,
     command: Option<std::process::Child>,
-    last_heartbeat: Option<DateTime<Utc>>
+    last_heartbeat: Option<DateTime<Utc>>,
+    last_status: RateLimiter,
+    last_upload: RateLimiter
 }
 
 
 
 
 impl Work{
-
 
 
 
@@ -51,7 +55,9 @@ impl Work{
             blendfiles: HashMap::<String, Option<Blendfile>>::new(),
             parent_jobs: HashMap::<String, String>::new(),
             command: None,
-            last_heartbeat: None
+            last_heartbeat: None,
+            last_status: RateLimiter::new(),
+            last_upload: RateLimiter::new()
         }
     }
 
@@ -70,6 +76,7 @@ impl Work{
         // Add new tasks only if we don't exceed the number of tasks definied \
         // in the workload setting
         self.get_tasks(channel);
+        // dbg!(&self);
 
         // Update each unique parent job status for all the Tasks
         self.update_parent_job_status();
@@ -77,7 +84,9 @@ impl Work{
         // Get the blendfile from the server only if there are 
         // tasks that actually need one
         self.get_blendfiles();
-
+        // dbg!(&self);
+        // std::process::exit(1);
+        
         // Construct Commands for Tasks that have a matching blendfile on \
         // disk and whose commands are not constructed yet
         self.construct_commands();
@@ -88,10 +97,16 @@ impl Work{
         // Dispatch a Command for the current Task ("self.current")
         self.run_command(channel);
 
-        // Cleanup finished blendfiles
+        // Get the filesize and hash for the rendered frames of a Task
+        self.stat_finished(channel);
+
+        // Upload the finished files
+        self.upload_finished(channel);
+
+        // Cleanup finished and uploaded blendfiles
         self.cleanup_blendfiles();
 
-        // Send a heart beat to the qu
+        // Send a heart beat to the qu to signal you are alive
         self.beat_heart(channel);
     }  
 

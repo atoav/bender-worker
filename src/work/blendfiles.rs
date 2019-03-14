@@ -36,29 +36,39 @@ impl Work{
 
     /// Update the parent Jobs status via request
     pub fn fetch_parent_jobs_stati(&mut self) {
-        // Clear the hashmap
-        self.parent_jobs.clear();
-        // Collect all unique parent ids into a Vec
-        let u: Vec<String> = self.unique_parent_ids()
-                                 .map(|id| id.to_string())
-                                 .collect();
-        // For each unique parent id request the current job status from flaskbender
-        u.iter()
-         .for_each(|id|{
-            match self.request_jobstatus(id.to_string()) {
-                Ok(status) => {
-                    // Status is a string that looks like this: {'Job': 'Queued'}
-                    let status = status.split('\'').collect::<Vec<&str>>();
-                    match status.get(3){
-                        Some(s) => {
-                            self.parent_jobs.insert(id.to_string(), s.to_string());
-                        },
-                        None => errrun(format!("While requesting job status for [{}], malformed response", id.to_string()))
+        // let Self{ tasks, last_staus, ..} = self;
+        if self.last_status.should_run(){
+            // Clear the hashmap
+            self.parent_jobs.clear();
+            // Collect all unique parent ids into a Vec
+            let u: Vec<String> = self.unique_parent_ids()
+                                     .map(|id| id.to_string())
+                                     .collect();
+            // For each unique parent id request the current job status from flaskbender
+            u.iter()
+             .for_each(|id|{
+                match self.request_jobstatus(id.to_string()) {
+                    Ok(status) => {
+                        // Status is a string that looks like this: {'Job': 'Queued'}
+                        let status = status.split('\'').collect::<Vec<&str>>();
+                        match status.get(3){
+                            Some(s) => {
+                                self.last_status.set_last();
+                                self.parent_jobs.insert(id.to_string(), s.to_string());
+                            },
+                            None => {
+                                self.last_status.set_last_failed();
+                                errrun(format!("While requesting job status for [{}], malformed response", id.to_string()))
+                            }
+                        }
+                    },
+                    Err(err) => {
+                        self.last_status.set_last_failed();
+                        errrun(format!("While requesting job status for [{}]: {}", id.to_string(), err))
                     }
-                },
-                Err(err) => errrun(format!("While requesting job status for [{}]: {}", id.to_string(), err))
-            }
-         })
+                }
+             })
+        }
     }
 
     /// Update the parent Jobs status via read
@@ -224,7 +234,6 @@ impl Work{
     /// into self.blendfiles
     pub fn fetch_blendfiles(&mut self, ids: Vec<String>){
         
-
         // Only dispatch a request if we have something to reqeust
         if !ids.is_empty(){ 
             // For each remaining ID start a request and insert the resulting path
@@ -235,15 +244,14 @@ impl Work{
                     // println!("{:?}", p);
                     let opt_bf = if p.as_path().exists() { Some(Blendfile::new(p)) } else { None };
                     self.blendfiles.insert(id.to_string(), opt_bf);
-                    
                  });
-        }
 
-        // If the length of unique ids equals the length of entries containing \
-        // Some<Blendfile> in Work::blendfiles, we assume that all files have \
-        // been downloaded 
-        if ids.len() == self.blendfiles.iter().map(|(_,x)| x).filter(|e|e.is_some()).count(){
-            okrun("Downloaded all blendfiles");
+            // If the length of unique ids equals the length of entries containing \
+            // Some<Blendfile> in Work::blendfiles, we assume that all files have \
+            // been downloaded 
+            if  ids.len() == self.blendfiles.iter().map(|(_,x)| x).filter(|e|e.is_some()).count(){
+                okrun("Downloaded all blendfiles");
+            }
         }
     }
 
