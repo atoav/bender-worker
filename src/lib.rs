@@ -77,9 +77,9 @@ Usage:
   bender-worker
   bender-worker --configure [--independent]
   bender-worker --independent
-  bender-worker clean [--force]
-  bender-worker clean blendfiles [--force]
-  bender-worker clean frames [--force]
+  bender-worker clean [--force] [--on-server]
+  bender-worker clean blendfiles [--force] [--on-server]
+  bender-worker clean frames [--force] [--on-server]
   bender-worker get outpath
   bender-worker get blendpath
   bender-worker get id
@@ -89,6 +89,7 @@ Usage:
 
 Options:
   --force, -f         Don't ask for confirmation, just do it
+  --on-server, -s     Run on the server directories (if on server)
   --configure         Run configuration
   --independent, -i   Run local
   -h --help           Show this screen.
@@ -99,6 +100,8 @@ Options:
 pub struct Args {
     flag_configure: bool,
     flag_independent: bool,
+    flag_force: bool,
+    flag_on_server: bool,
     cmd_get: bool,
     cmd_outpath: bool,
     cmd_blendpath: bool,
@@ -107,16 +110,15 @@ pub struct Args {
     cmd_clean: bool,
     cmd_blendfiles: bool,
     cmd_frames: bool,
-    flag_force: bool,
 }
 
 
 
 
 pub fn run_main(){
-    let args: Args = Docopt::new(USAGE)
-                            .and_then(|d| d.deserialize())
-                            .unwrap_or_else(|e| e.exit());
+    let mut args: Args = Docopt::new(USAGE)
+                                    .and_then(|d| d.deserialize())
+                                    .unwrap_or_else(|e| e.exit());
 
 
     // Read the config (if there is one) and get the path for frames
@@ -135,6 +137,10 @@ pub fn run_main(){
     }else if args.cmd_clean{
         command::clean(&args);
     }else{
+        // Force clean the directories to avoid long time clutter
+        args.flag_force = true;
+        command::clean(&args);
+        // Then run
         command::run(&args);
     }
 }

@@ -4,9 +4,6 @@ use bender_mq::BenderMQ;
 use std::fs::DirBuilder;
 
 #[cfg(target_os = "linux")]
-use std::os::unix::fs::PermissionsExt;
-
-#[cfg(target_os = "linux")]
 use std::os::unix::fs::DirBuilderExt;
 
 
@@ -138,53 +135,19 @@ pub fn clean(args: &Args){
 
 /// Subcommand to delete all of the workers file witrh confirmation if there is a config
 pub fn clean_gentle(args: &Args, config: &WorkerConfig) {
-    if !args.cmd_frames || args.cmd_blendfiles {
+    if (!args.cmd_frames || args.cmd_blendfiles) && (config.mode.is_independent() || args.flag_on_server) {
         let p = config.blendpath.to_string_lossy().to_string();
         let msg = format!("{}", format!("Delete all files at {} ?", p).on_bright_red());
         if Confirmation::new().with_text(&msg).interact().unwrap(){
-            match fs::remove_dir_all(&p){
-                Ok(_) => {
-                    println!("{}", format!(" ✔ Deleted the contents of {}", p).green());
-
-                    // Create frames directory with 775 permissions on Unix
-                    let mut builder = DirBuilder::new();
-
-                    if !cfg!(windows){
-                        // Set the permissions to 775
-                        builder.mode(0o2775);
-                    }
-                    match builder.recursive(true).create(&p){
-                        Ok(_) => println!("Recreated directory {} with permission 2775", &*p),
-                        Err(err) => eprintln!(" ✖ [WORKER] Error: Couldn't recreate Directory {}", err)
-                    } 
-                },
-                Err(err) => eprintln!("{}", format!(" ✖ Error while deleting in {}: {}", p, err).red())
-            }
+            delete_blendfiles(&config);
         }
     }
 
-    if !args.cmd_blendfiles || args.cmd_frames {
+    if (!args.cmd_blendfiles || args.cmd_frames) && (config.mode.is_independent() || args.flag_on_server) {
         let p = config.outpath.to_string_lossy().to_string();
         let msg = format!("{}", format!("Delete all files at {} ?", p).on_bright_red());
         if Confirmation::new().with_text(&msg).interact().unwrap(){
-            match fs::remove_dir_all(&p){
-                Ok(_) => {
-                    println!("{}", format!(" ✔ Deleted the contents of {}", p).green());
-
-                    // Create frames directory with 775 permissions on Unix
-                    let mut builder = DirBuilder::new();
-
-                    if !cfg!(windows){
-                        // Set the permissions to 775
-                        builder.mode(0o2775);
-                    }
-                    match builder.recursive(true).create(&p){
-                        Ok(_) => println!("Recreated directory {} with permission 2775", &*p),
-                        Err(err) => eprintln!(" ✖ [WORKER] Error: Couldn't recreate Directory {}", err)
-                    } 
-                },
-                Err(err) => eprintln!("{}", format!(" ✖ Error while deleting in {}: {}", p, err).red())
-            }
+            delete_framesfolder(&config);
         }
     }
 }
@@ -194,67 +157,68 @@ pub fn clean_gentle(args: &Args, config: &WorkerConfig) {
 /// Subcommand to delete all of the workers files by force (if there is a config)
 pub fn clean_force(args: &Args, config: &WorkerConfig){
     // Delete Jobs
-    if !args.cmd_frames || args.cmd_blendfiles {
-        let p = config.blendpath.to_string_lossy().to_string();
-        match fs::read_dir(&p){
-            Ok(entries) => {
-                for entry in entries{
-                    match entry{
-                        Ok(e) => {
-                            let path = e.path();
-                            // Only delete blendfiles/<id> directories don't 
-                            // touch any files there (e.g. for frame counting)
-                            if path.is_dir(){
-                                match fs::remove_dir_all(&path) {
-                                    Ok(_) => println!("{}", format!(" ✔ Deleted the contents of {}", path.to_string_lossy()).green()),
-                                    Err(err) => eprintln!("{}", format!(" ✖ Error while deleting in {}: {}", path.to_string_lossy(), err).red())
-                                }
-                            }
-                        },
-                        Err(err) => eprintln!("{}", format!(" ✖ Error: Couldn't read: {}", err).red())
-                    }
-                }
-            },
-            Err(err) => eprintln!("{}", format!(" ✖ Error: Couldn't read \"{}\": {}", &p, err).red())
-        }
+    if (!args.cmd_frames || args.cmd_blendfiles) && (config.mode.is_independent() || args.flag_on_server) {
+        delete_blendfiles(&config);
     }
     // Delete Frames
-    if !args.cmd_blendfiles || args.cmd_frames {
-        let p = &config.outpath;
-        match fs::metadata(p){
-            Ok(meta) => {
-                if !cfg!(windows){
-                    // Set the permissions to 775
-                    let mut permissions = meta.permissions();
-                    permissions.set_mode(0o775);
-                }
-                // Remove Frames in the directory
-                match fs::read_dir(&p) {
-                    Ok(entries)  => {
-                        for entry in entries {
-                            match entry {
-                                Ok(e) => {
-                                    let job_frames = e.path();
-                                    match fs::remove_dir_all(&job_frames){
-                                        Ok(()) => println!("{}", format!(" ✔ Deleted Frames at {}", &job_frames.to_string_lossy()).green()),
-                                        Err(err) => eprintln!("{}", format!(" ✖ Error: couldn't delete Frames at {}: {}", &job_frames.to_string_lossy(), err).red())
-                                    }
-                                },
-                                Err(err) => eprintln!("{}", format!(" ✖ Error while reading reading frame directory at {}: {}", p.to_string_lossy(), err).red())
-                            }
-                        }
-
-                    },
-                    Err(err) =>{
-                        eprintln!("{}", format!(" ✖ Error while reading reading frame directory at {}: {}", p.to_string_lossy(), err).red())
-                    }
-                }
-            },
-            Err(err) => eprintln!("{}", format!(" ✖ Error while reading metadata of file at {}: {}", p.to_string_lossy(), err).red())
-        }
+    if (!args.cmd_blendfiles || args.cmd_frames) && (config.mode.is_independent() || args.flag_on_server) {
+        delete_framesfolder(&config);
     }
 }
 
+/// Delete the contents of the blendfiles directory specified in the config. 
+/// This only deletes files whose extension starts with .blend
+fn delete_blendfiles(config: &WorkerConfig){
+    let p = config.blendpath.clone();
+    match fs::read_dir(&p){
+        Ok(entries) => {
+            for entry in entries {
+                match entry{
+                    Ok(e) => {
+                        let path = e.path();
+                        if path.is_file() && path.extension().is_some() && path.extension().unwrap().to_string_lossy().to_lowercase().starts_with("blend"){
+                            match fs::remove_file(&path) {
+                                Ok(_) => println!("{}", format!(" ✔ Deleted blendfile at {}", path.to_string_lossy()).green()),
+                                Err(err) => eprintln!("{}", format!(" ✖ Error while deleting {}: {}", path.to_string_lossy(), err).red())
+                            }
+                        }
+                    },
+                    Err(err) => eprintln!("{}", format!(" ✖ Error: Couldn't read: {}", err).red())
+                }
+            }
+        },
+        Err(err) => eprintln!("{}", format!(" ✖ Error: Couldn't read \"{}\": {}", &p.to_string_lossy(), err).red())
+    }
+}
+
+
+/// Delete the contents of the Frames directory specified in the config. 
+/// Recreate with the given permissions
+fn delete_framesfolder(config: &WorkerConfig){
+    let p = &config.outpath;
+    if p.is_dir(){
+        match fs::remove_dir_all(&p){
+            Ok(_) => {
+                println!("{}", format!(" ✔ Deleted the contents of {}", p.to_string_lossy()).green());
+
+                // Create frames directory with 775 permissions on Unix
+                let mut builder = DirBuilder::new();
+
+                if !cfg!(windows){
+                    // Set the permissions to 775
+                    builder.mode(0o2775);
+                }
+                match builder.recursive(true).create(&p){
+                    Ok(_) => println!("Recreated directory {} with permission 2775", &*p.to_string_lossy()),
+                    Err(err) => eprintln!(" ✖ [WORKER] Error: Couldn't recreate Directory {}", err)
+                } 
+            },
+            Err(err) => eprintln!("{}", format!(" ✖ Error while deleting in {}: {}", p.to_string_lossy(), err).red())
+        } 
+    }else{
+        eprintln!("{}", format!(" ✖ Error: Couldn't read directory at {} because it wasn't a directory or didn't exist", p.to_string_lossy()));
+    }
+}
 
 
 /// Get the paths to the configuration file and the user cache
