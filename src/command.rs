@@ -313,6 +313,7 @@ pub fn run_worker(args: &Args, app_configpath: PathBuf, app_cachepath: PathBuf){
                     config.outpath.to_string_lossy() );
                 process::exit(1);
             }
+            scrnmsg(format!("Running in Independent Mode. Using the config at {}", app_configpath.to_string_lossy()));
             // We sucessfully created a config file, let's go ahead
             scrnmsg(format!("This Worker has the ID:             [{}]", config.id));
 

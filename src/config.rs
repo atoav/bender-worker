@@ -218,7 +218,6 @@ pub fn get_config<P>(app_configpath: P, app_cachepath: P, args: &Args) -> GenRes
     let app_cachepath = app_cachepath.into();
     // If there is a --independent or -i flag, immidiately return the local config
     if args.flag_independent || !on_server{
-        scrnmsg(format!("Running in Independent Mode. Using the config at {}", app_configpath.to_string_lossy()));
         let c = get_worker_config(app_configpath, app_cachepath, args)?;
         Ok(c)
     }else{
