@@ -7,7 +7,6 @@ use std::process::{Stdio};
 use std::io::{BufRead, BufReader};
 use std::process::Command;
 use std::time::Duration;
-use bender_job::frames::FrameMap;
 use users::{Groups, UsersCache};
 use std::fs::DirBuilder;
 
@@ -45,13 +44,13 @@ impl Work{
                         if !cfg!(windows){
                             // Set the permissions to 775
                             match builder.mode(0o2775).recursive(true).create(&out){
-                                Ok(_) => println!("Created directory {} with permission 2775", &out.to_string_lossy()),
+                                Ok(_) => (), // println!("Created directory {} with permission 2775", &out.to_string_lossy()),
                                 Err(err) => eprintln!(" ✖ [WORKER] Error: Couldn't create Directory {}", err)
                             } 
                         } else {
                             // Set the permissions to 775
                             match builder.recursive(true).create(&out){
-                                Ok(_) => println!("Created directory {}", &out.to_string_lossy()),
+                                Ok(_) => (), // println!("Created directory {}", &out.to_string_lossy()),
                                 Err(err) => eprintln!(" ✖ [WORKER] Error: Couldn't create Directory {}", err)
                             } 
                         }
@@ -60,8 +59,13 @@ impl Work{
                         let outstr = out.to_string_lossy().to_string();
                         task.construct(p.clone(), outstr.clone());
                         match task.command{
-                            bender_job::Command::Blender(ref c) => println!(" ✚ [WORKER][{}] Constructed task for frame [{}]", &task.id[..6], c.frame.to_string()),
-                            _ => println!(" ✚ [WORKER] Constructed generic task [{}]", task.id)
+                            bender_job::Command::Blender(_) => println!(" ✚ [WORKER][{task_id}][{parent_id}][{short}] Constructed Task", 
+                                task_id=&task.id[..6],
+                                parent_id=&task.parent_id[..6], 
+                                short=task.command.short()),
+                            _ => println!(" ✚ [WORKER][{task_id}][{parent_id}] Constructed generic task ", 
+                                task_id=&task.id[..6],
+                                parent_id=&task.parent_id[..6])
                         }
                     }
                 });
@@ -100,7 +104,10 @@ impl Work{
                                                        .stderr(Stdio::piped())
                                                        .spawn(){
                                     Ok(c) => {
-                                        println!(" ⚟ [WORKER][{}] Dispatched Command: \"blender {}\"", &task.id[..6], args.join(" "));
+                                        println!(" ⚟ [WORKER][{task_id}][{parent_id}][{short}] Dispatched Command", 
+                                            task_id=&task.id[..6], 
+                                            parent_id=&task.parent_id[..6],
+                                            short=task.command.short());
                                         self.command = Some(c);
                                         
                                         ExitStatus::Running
@@ -115,7 +122,10 @@ impl Work{
                                                        .stderr(Stdio::piped())
                                                        .spawn(){
                                     Ok(c) => {
-                                        println!(" ⚟ [WORKER][{}] Dispatched Command: \"blender {}\"", &task.id[..6], args.join(" "));
+                                        println!(" ⚟ [WORKER][{task_id}][{parent_id}][{short}] Dispatched Command", 
+                                            task_id=&task.id[..6], 
+                                            parent_id=&task.parent_id[..6],
+                                            short=task.command.short());
                                         self.command = Some(c);
                                         
                                         ExitStatus::Running

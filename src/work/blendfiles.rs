@@ -17,7 +17,7 @@ use ::*;
 use chrono::prelude::*;
 use chrono::Duration;
 use itertools::Itertools;
-use bender_job::{Status, Task, Job};
+use bender_job::{Status, Task, Job, Command, FrameMap};
 
 
 
@@ -125,11 +125,38 @@ impl Work{
         self.parent_jobs.iter().all(|(_id, status)|status.contains("Finished"))
     }
 
+    pub fn cleanup_frames(&self){
+        if self.config.mode.is_independent() && self.has_task(){
+            // Delete frames dynamically as they have been uploaded
+            self.tasks.iter()
+                      .filter(|t| t.is_finished()) // only finished tasks
+                      .filter(|t| {  // Only Tasks with all frames uploaded
+                        if let Command::Blender(ref b) = t.command{
+                            b.frame.all_uploaded()
+                        }else{
+                            false
+                        }
+                      })
+                      .for_each(|t|{ // delete all frames in our way
+                        if let Command::Blender(ref b) = t.command{
+                            b.renderpaths()
+                             .iter()
+                             .for_each(|path|{
+                                if path.is_file() {
+                                    match fs::remove_file(path){
+                                        Ok(_) => (),
+                                        Err(err) => errrun(format!("Failed to remove uploaded frame at {}: {}", path.to_string_lossy(), err))
+                                    }
+                                }
+                             })
+                        }
+                      });
+        }
+    }
 
     /// Delete finished blendfiles that are done and overdue
     pub fn cleanup_blendfiles(&mut self) {
-        if self.has_task() && !self.all_jobs_finished()
-            && self.any_job_finished() && !self.config.mode.is_server(){
+        if self.has_task() && self.config.mode.is_independent(){
             // Collect all Blendfile IDs that have all their tasks finished.
             let potentially_finished: Vec<String> = 
             self.blendfiles.iter()
@@ -139,7 +166,11 @@ impl Work{
                                 self.get_tasks_for_parent_id(job_id.as_str())
                                     .iter()
                                     .all(|t|{
-                                        t.is_ended()
+                                        if let Command::Blender(ref b) = t.command{
+                                            t.is_ended() && b.frame.all_uploaded()
+                                        }else{
+                                            t.is_ended()
+                                        }
                                     })
                             })
                             // Filter out jobs that are still within the grace period
@@ -150,23 +181,37 @@ impl Work{
                                 }
                                 
                             })
-                            // Filter out jobs with unhashed/not uploaded frames
-                            //TODO
                             .map(|(id, _)| id.clone())
                             .collect();
 
             // Check if the parent_job is finished
-            let shall_finish: Vec<String> = potentially_finished.iter()
+            let mut shall_finish: Vec<String> = potentially_finished.iter()
                                                    .cloned()
                                                    .filter(|id|{
                                                         self.job_is_finished(id.as_str())
                                                    })
                                                    .collect();
 
-            // Remove tasks that are contained in finished blendfiles
-            self.tasks.retain(|ref task| shall_finish.contains(&task.parent_id));
+            // Keep tasks whose parent_id is _not_ contained in `shall_finish`
+            self.tasks.retain(|task| {
+                if !shall_finish.contains(&task.parent_id){
+                    true
+                }else{
+                    println!("   [WORKER][{task_id}][{parent_id}][{short}] Removed Task because job was finished",
+                        task_id=&task.id[..6],
+                        parent_id=&task.parent_id[..6],
+                        short=task.command.short());
+                    false
+                }
+            });
 
-            // Transform the ids into  a tuple with ids and paths
+            // Filter out all jobs who still have tasks in self.tasks after 
+            // they have been removed above. 
+            shall_finish.retain(|id| {
+                            !self.tasks.iter().any(|ref task| &task.parent_id == id)
+                        });
+
+            // Transform the ids into a tuple with ids and paths
             let shall_finish: Vec<(String, PathBuf)> =
             shall_finish.iter()
                         .map(|id| {
@@ -185,13 +230,25 @@ impl Work{
                                 match fs::remove_file(&path){
                                     Ok(_) => {
                                         okrun(format!("Deleted blendfile for finished job [{}]", id));
-                                        true
+                                        let mut framedirectory = path.clone();
+                                        framedirectory.pop();
+                                        framedirectory.pop();
+                                        framedirectory.push("frames");
+                                        framedirectory.push(id);
+                                        match fs::remove_dir(&framedirectory){
+                                            Ok(_) => true,
+                                            Err(err) => {
+                                                errrun(format!("Couldn't delete frame directory for finished job ({}): {}", framedirectory.to_string_lossy(), err));
+                                                false
+                                            }
+                                        }
                                     },
                                     Err(err) => {
                                         errrun(format!("Couldn't delete blendfile for finished job ({}): {}", path.to_string_lossy(), err));
                                         false
                                     }
                                 }
+                                
                             } else {
                                  okrun(format!("ಠ_ಠ Tried to delete blendfile for finished job at {}, but it was already gone... that is okay I guess..", path.to_string_lossy()));
                                  true
@@ -201,7 +258,7 @@ impl Work{
                         .filter(|&(_, erase)| erase)
                         .for_each(|(id, _)| {
                             let _ = self.blendfiles.remove(id.as_str());
-                            okrun(format!("Forgot blendfile for [{}]", id));
+                            // okrun(format!("Forgot blendfile for [{}]", id));
                         } );
         }
     }
@@ -351,7 +408,6 @@ impl Work{
     pub fn unique_parent_ids<'a>(&'a self) -> impl Iterator<Item = &str> + 'a{
         self.tasks
             .iter()
-            .filter(|t| !t.is_ended())
             .map(|task| task.parent_id.as_str())
             .unique()
     }

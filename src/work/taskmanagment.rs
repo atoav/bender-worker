@@ -30,13 +30,10 @@ impl Work{
         }else{
             // Do not add new tasks if we have reached the workload defined in Tasks
             let active_task_count = self.tasks.iter()
-                                         .filter(|t| !t.is_ended())
-                                         .count();
+                                              .filter(|t| !t.is_ended())
+                                              .count();
             active_task_count < self.config.workload
         }
-
-        // let self.unique_parent_ids()
-        // && self.job_is_finished(t.parent_id)
     }
 
     /// Listen in to work queue and get n messages (defined by the workload setting)
@@ -53,7 +50,6 @@ impl Work{
                    .for_each(|message|{
                         match Task::deserialize_from_u8(&message.body){
                             Ok(mut t) => {
-                                
                                 // Add Delivery tag to task data for later acknowledgement
                                 t.add_data("task-delivery-tag", message.reply.delivery_tag.to_string().as_str());
                                 
@@ -64,8 +60,9 @@ impl Work{
                                 // Set the status of the task to queued
                                 t.queue();
 
-                                println!(" ✚ [WORKER][{id}] Received Task for {short}", 
-                                    id=&t.id[..6],
+                                println!(" ✚ [WORKER][{task_id}][{parent_id}][{short}] Received Task", 
+                                    task_id=&t.id[..6],
+                                    parent_id=&t.parent_id[..6],
                                     short=t.command.short());
                                 // Add the newly modified Task to the queue
                                 self.tasks.push(t);
@@ -91,7 +88,7 @@ impl Work{
 
     /// Returns true if there is at least one task
     pub fn has_task(&self) -> bool{
-        !self.tasks.is_empty()
+        !self.tasks.is_empty() || self.current.is_some()
     }
 
     /// Return all tasks that have a given parent id
@@ -100,6 +97,13 @@ impl Work{
         self.tasks.iter()
                   .filter(|&task| task.parent_id == id)
                   .collect()
+    }
+
+    /// Return the first task that has a given parent id
+    pub fn get_first_task_for_parent_id<S>(&self, id: S) -> Option<&Task> where S: Into<String>{
+        let id = id.into();
+        self.tasks.iter()
+                  .find(|&task| task.parent_id == id)
     }
 
 
@@ -129,23 +133,26 @@ impl Work{
                 // - has a blendfile
                 // - has a constructed command
                 // - is queued
-                // then remove this Task from the list and tore it in next
-                while i < self.tasks.len() {
+                // then remove this Task from the list and store it in next
+                while i < self.tasks.len() && next.is_none() {
                     if self.has_blendfile(&self.tasks[i]) &&
                         self.tasks[i].command.is_constructed() &&
                         (self.tasks[i].is_queued() || self.tasks[i].is_running()) &&
                         next.is_none() {
-                            // println!("SELECTED TASK [{}]", &self.tasks[i].id);
+                            println!(" ▷ [WORKER][{task_id}][{parent_id}][{short}] ◁--- Selected as next Task", 
+                                task_id=&self.tasks[i].id[..6],
+                                parent_id=&self.tasks[i].parent_id[..6],
+                                short=self.tasks[i].command.short());
                             next = Some(self.tasks.remove(i));
                     } else {
                             i += 1;
-                            if i < self.tasks.len() {
-                                // println!("SELECTION for {}", &self.tasks[i].id);
-                                // println!("              has_blendfile:  {}", self.has_blendfile(&self.tasks[i]));
-                                // println!("              is_constructed: {}", self.tasks[i].command.is_constructed());
-                                // println!("              is_queued:      {}", self.tasks[i].is_queued());
-                                // println!("              next.is_none:   {}\n", next.is_none());
-                            }
+                            // if i < self.tasks.len() {
+                            //     println!("SELECTION for {}", &self.tasks[i].id);
+                            //     println!("              has_blendfile:  {}", self.has_blendfile(&self.tasks[i]));
+                            //     println!("              is_constructed: {}", self.tasks[i].command.is_constructed());
+                            //     println!("              is_queued:      {}", self.tasks[i].is_queued());
+                            //     println!("              next.is_none:   {}\n", next.is_none());
+                            // }
                     }
                 }
 
@@ -153,7 +160,10 @@ impl Work{
                 // self.current only if there is an actual Task
                 if let Some(mut t) = next {
                     t.start();
-                    println!(" ✚ [WORKER][{}] Queued task for job [{}]", &t.id[..6], t.parent_id);
+                    println!(" ✚ [WORKER][{task_id}][{parent_id}][{short}] Queued Task", 
+                        task_id=&t.id[..6], 
+                        parent_id=&t.parent_id[..6],
+                        short=t.command.short());
                     let routing_key = format!("start.{}", self.config.id);
                     match t.serialize_to_u8(){
                         Ok(task_json) => channel.worker_post(routing_key, task_json),
@@ -246,7 +256,6 @@ impl Work{
             // Split the borrow
             let Self{ tasks, last_upload, ..} = self;
             if last_upload.should_run(){
-
                 let worker_id = self.config.id;
                 let mode_is_independent = self.config.mode.is_independent();
                 let bender_url = self.config.bender_url.clone();
@@ -278,29 +287,41 @@ impl Work{
                             }
                           })
                           .for_each(|task|{
-                                
                                 if mode_is_independent{
                                     let mut url = bender_url.clone();
                                     url = url+"/job/"+&*task.parent_id.clone()+"/"+&*task.id.clone();
-                                    println!("    Requesting {}", url);
+                                    println!(" @ [WORKER][{task_id}][{parent_id}][{short}] Upload started", 
+                                        task_id=&task.id[..6], 
+                                        parent_id=&task.parent_id[..6], 
+                                        short=task.command.short());
                                     match task.command.post_frames(url){
                                         Ok(mut responses) => {
                                             if responses[0].status().is_success(){
-                                                okrun(format!("Server responded with: {:#?}", responses[0].text()
-                                                                                                           .unwrap_or_else(|_| "Couldn't descramble response".to_string())));
+                                                println!(" @ [WORKER][{task_id}][{parent_id}][{short}] Upload sucessful", 
+                                                    task_id=&task.id[..6], 
+                                                    parent_id=&task.parent_id[..6], 
+                                                    short=&task.command.short());
                                                 if let Command::Blender(ref mut b) = task.command{
                                                     b.set_all_uploaded().unwrap();
                                                 }
                                                 last_upload.set_last()
                                             }else{
                                                 last_upload.set_last_failed();
-                                                errrun(format!("Server responded with: {:#?}", responses[0].text()
-                                                                                                           .unwrap_or_else(|_| "Couldn't descramble response".to_string())));
+                                                errrun(format!("[{}][{}][{}] Server responded with: {:#?}", 
+                                                    &task.id[..6], 
+                                                    &task.parent_id[..6], 
+                                                    &task.command.short(),
+                                                    responses[0].text()
+                                                                .unwrap_or_else(|_| "Couldn't descramble response".to_string())));
                                             }
                                         },
                                         Err(err) => {
                                             last_upload.set_last_failed();
-                                            errrun(format!("Couldn't post_frames failed with Error: {}", err))
+                                            errrun(format!("[{}][{}] Couldn't post_frames for {}, failed with Error: {}",
+                                                &task.id[..6], 
+                                                &task.parent_id[..6], 
+                                                &task.command.short(), 
+                                                err))
                                         }
                                     }
                                 }else{
@@ -346,7 +367,7 @@ impl Work{
             let routing_key = format!("finish.{}", self.config.id);
             match t.serialize_to_u8(){
                 Ok(task_json) => channel.worker_post(routing_key, task_json),
-                Err(err) => eprintln!(" ✖ [WORKER] Error: Failed ot deserialize Task {}: {}", t.id, err)
+                Err(err) => eprintln!(" ✖ [WORKER] Error: Failed ot deserialize Task {}: {}", &t.id[..6], err)
             }
 
             moved = true;
@@ -357,8 +378,10 @@ impl Work{
                             bf.increment_frame();
                             let duration = bf.last_frame_duration().unwrap();
                             let average = bf.average_duration();
-                            println!("{}", format!(" ✔️ [WORKER][{task_id}] Finished task (Duration: {duration}, Average Duration: {average})", 
+                            println!("{}", format!(" ✔️ [WORKER][{task_id}][{parent_id}][{short}] Finished Task after: {duration} (Average: {average})", 
                                 task_id=&t.id[..6], 
+                                parent_id=&t.parent_id[..6],
+                                short=t.command.short(),
                                 duration=format_duration(duration),
                                 average=format_duration(average)).green(),
                             );
@@ -386,11 +409,11 @@ impl Work{
             t.error();
             self.tasks.push(t.clone());
             moved = true;
-            eprintln!("{}", format!(" ✖ [WORKER][{}] Errored task for job [{}]: {}", &t.id[..6], t.parent_id, err).red());
+            eprintln!("{}", format!(" ✖ [WORKER][{}][{}] Errored task for job: {}", &t.id[..6], &t.parent_id[..6], err).red());
             let routing_key = format!("error.{}", self.config.id);
             match t.serialize_to_u8(){
                 Ok(task_json) => channel.worker_post(routing_key, task_json),
-                Err(err) => eprintln!(" ✖ [WORKER] Error: Failed to deserialize Task {}: {}", &t.id[..6], err)
+                Err(err) => eprintln!(" ✖ [WORKER][{}] Error: Failed to deserialize Task: {}", &t.id[..6], err)
             }
         }
 
@@ -414,5 +437,12 @@ impl Work{
                         }
                     }
                   })
+    }
+
+
+    pub fn sleep(&self){
+        if !self.has_task(){
+            sleep(Duration::from_millis(2000));
+        }
     }
 }

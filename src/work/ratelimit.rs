@@ -6,12 +6,12 @@ use chrono::Utc;
 /// The RateLimiter allows to exponentially backoff failing tasks
 #[derive(Debug, Default, Clone, Copy)]
 pub struct RateLimiter{
-    last:        Option<DateTime<Utc>>,
-    last_failed: Option<DateTime<Utc>>,
-    n_failed:    usize,
-    n_max:       usize,
-    min_rate_s:  usize,
-    max_rate_s:  usize
+    last:         Option<DateTime<Utc>>,
+    last_failed:  Option<DateTime<Utc>>,
+    n_failed:     usize,
+    n_max:        usize,
+    min_rate_s:   usize,
+    max_rate_s:   usize
 }
 
 
@@ -58,12 +58,12 @@ impl RateLimiter{
         match (self.last, self.last_failed){
             (None, None) => true,
             (Some(last), None) => {
-                let threshold = self.calculate_minimum_rate();
-                last > threshold
+                let delta = self.calculate_minimum_rate();
+                Utc::now() > last + delta
             },
             (None, Some(last_failed)) => {
-                let backoff_threshold_duration = self.calculate_backoff();
-                last_failed > backoff_threshold_duration
+                let delta = self.calculate_backoff();
+                Utc::now() > last_failed + delta
             },
             _ => false
         }
@@ -73,20 +73,18 @@ impl RateLimiter{
     /// times `set_last_failed()` has been called, exponentially blending \
     /// between `min_rate_s` and `max_rate_s`, with the `max_rate_s` beeing \
     /// reached after `n_max` tries.
-    fn calculate_backoff(&self) -> chrono::DateTime<Utc>{
+    fn calculate_backoff(&self) -> chrono::Duration{
         let factor = self.n_failed as f64 / self.n_max as f64;
         // Exponential Backoff
         let factor = factor * factor;
         // Blend between the min_rate_s and the max_rate_s exponentially
         let d = (self.min_rate_s + (self.max_rate_s-self.min_rate_s)) as f64 * factor;
         // Return a chrono::Duration
-        let delta = chrono::Duration::seconds(d.round() as i64);
-        Utc::now() + delta
+        chrono::Duration::seconds(d.round() as i64)
     }
 
-    fn calculate_minimum_rate(&self) -> chrono::DateTime<Utc>{
-        let delta = chrono::Duration::seconds(self.min_rate_s as i64);
-        Utc::now() + delta
+    fn calculate_minimum_rate(&self) -> chrono::Duration{
+        chrono::Duration::seconds(self.min_rate_s as i64)
     }
 
 
