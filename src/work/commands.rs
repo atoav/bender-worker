@@ -33,7 +33,7 @@ impl Work{
                 .filter(|task| task.data.contains_key("blendfile"))
                    .for_each(|task|{
                     // we can unwrap this because, the key "blendfile" only exists
-                       // if there is a value
+                    // if there is a value
                     let p = &task.data["blendfile"].clone();
                     let mut out = self.config.outpath.clone();
                     out.push(task.parent_id.as_str());

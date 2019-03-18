@@ -81,26 +81,23 @@ impl Work{
 /// Execute the jobs blendfile with optimize_blend.py, gather data and optimize settings.
 fn optimize(blendpath: PathBuf) -> GenResult<()>{
     if Path::new(&blendpath).exists(){
-                // Run Blend with Python
-                match NamedTempFile::new(){
-                    Ok(mut tempfile) => {
-                        match io::copy(&mut OPTIMIZE_PY.as_bytes(), &mut tempfile){
-                            Ok(_) => {
-                                let path = tempfile.path();
-                                match run_with_python(&*blendpath.to_string_lossy(), &path.to_string_lossy()){
-                                    Ok(_) =>{
-                                        Ok(())
-                                    },
-                                    Err(err) =>{
-                                        Err(From::from(format!("Error while running with optimize.py: {}",  err)))
-                                    }
-                                }
-                            },
-                            Err(err) => Err(From::from(format!("Error: Failed to copy optimize.py to tempfile: {}", err)))
+        // Run Blend with Python
+        match NamedTempFile::new(){
+            Ok(mut tempfile) => {
+                match io::copy(&mut OPTIMIZE_PY.as_bytes(), &mut tempfile){
+                    Ok(_) => {
+                        let path = tempfile.path();
+                        match run_with_python(&*blendpath.to_string_lossy(), &path.to_string_lossy()){
+                            Ok(_)    => Ok(()),
+                            Err(err) => Err(From::from(format!("Error while running with optimize.py: {}",  err)))
                         }
+
                     },
-                    Err(err) => Err(From::from(format!("Error: Couldn't create tempfile: {}", err)))
+                    Err(err) => Err(From::from(format!("Error: Failed to copy optimize.py to tempfile: {}", err)))
                 }
+            },
+            Err(err) => Err(From::from(format!("Error: Couldn't create tempfile: {}", err)))
+        }
     }else{
         Err(From::from(format!("Didn't find blendfile at {}", blendpath.to_string_lossy())))
     }
@@ -127,7 +124,8 @@ fn run_with_python<S>(path: S, pythonpath: S) -> GenResult<String>where S: Into<
             .arg("--disable-autoexec")
             .arg("--python")
             .arg(pythonpath)
-            .output()?;
+            .spawn()?
+            .wait_with_output()?;
 
     // Collect all lines starting with "{" for JSON
     let output: String = String::from_utf8(command.stdout.clone())?

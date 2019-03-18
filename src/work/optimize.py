@@ -28,14 +28,14 @@ if uses_cycles:
             bpy.context.user_preferences.addon['cycles'].preferences.compute_device_type = 'CUDA'
             cuda = True
         except:
-        if cuda:
-            try:
-                scene.cycles.device = 'GPU'
-            except:
-            scene.render.tile_x = 512
-            scene.render.tile_y = 512
+            if cuda:
+                try:
+                    scene.cycles.device = 'GPU'
+                except:
+                    scene.render.tile_x = 512
+                    scene.render.tile_y = 512
 
 
 
 # Overwrite the file
-bpy.ops.wm.save_as_mainfile(filepath=bpy.data.filepath, copy=True)
+# bpy.ops.wm.save_as_mainfile(filepath=bpy.data.filepath, copy=True)

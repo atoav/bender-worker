@@ -94,7 +94,7 @@ impl Work{
         // self.print_self("After construct_commands()");
 
         // Optimize Blendfiles for local consumtion
-        self.optimize_blendfiles();
+        // self.optimize_blendfiles();
 
         // Update who the current Task is ("self.current")
         self.select_next_task(channel);
