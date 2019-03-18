@@ -235,6 +235,12 @@ impl Work{
                                 match fs::remove_file(&path){
                                     Ok(_) => {
                                         okrun(format!("Deleted blendfile for finished job [{}]", id));
+                                        let mut blend1 = path.clone();
+                                        blend1.set_extension("blend1");
+                                        match fs::remove_file(&blend1){
+                                            Ok(_) => (),
+                                            Err(_err) => ()
+                                        }
                                         let mut framedirectory = path.clone();
                                         framedirectory.pop();
                                         framedirectory.pop();
