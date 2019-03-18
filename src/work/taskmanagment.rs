@@ -10,6 +10,7 @@ use amqp::Basic;
 use bender_job::{Task, Command, FrameMap};
 use bender_mq::BenderMQ;
 use work::blendfiles::format_duration;
+use blend::Blend;
 
 
 
@@ -135,7 +136,7 @@ impl Work{
                 // - is queued
                 // then remove this Task from the list and store it in next
                 while i < self.tasks.len() && next.is_none() {
-                    if self.has_blendfile(&self.tasks[i]) &&
+                    if self.blendfile_is_optimized(&self.tasks[i]) &&
                         self.tasks[i].command.is_constructed() &&
                         (self.tasks[i].is_queued() || self.tasks[i].is_running()) &&
                         next.is_none() {
@@ -374,7 +375,7 @@ impl Work{
             match self.blendfiles.get_mut(&t.parent_id){
                 Some(mut opt_bf) => {
                     match opt_bf{
-                        Some(ref mut bf) => {
+                        Blend::Optimized(ref mut bf) => {
                             bf.increment_frame();
                             let duration = bf.last_frame_duration().unwrap();
                             let average = bf.average_duration();
@@ -386,7 +387,8 @@ impl Work{
                                 average=format_duration(average)).green(),
                             );
                         },
-                        None => eprintln!("{}", format!(" ✖ [WORKER] Error: Couldn't find Job with ID {} in self.blendfiles... This must be a bug!", t.parent_id).red())
+                        Blend::Downloaded(_) => eprintln!("{}", format!(" ✖ [WORKER] Error: Tried to finish the Job with the ID {} in self.blendfiles, but it was not optimized ... This shouldn't ever happen!", t.parent_id).red()),
+                        Blend::None => eprintln!("{}", format!(" ✖ [WORKER] Error: Tried to finish the Job with the ID {} in self.blendfiles, but it was None... This shouldn't ever happen!", t.parent_id).red())
                     }
                 },
                 None => eprintln!("{}", format!(" ✖ [WORKER] Error: Couldn't find Job with ID {} in self.blendfiles... This must be a bug!", t.parent_id).red())
@@ -432,8 +434,9 @@ impl Work{
                   .for_each(|task|{
                     if let Some(blendfile) = blendfiles.get(&task.parent_id) {
                         match blendfile{
-                            Some(bf) => task.add_data("blendfile", &bf.path.to_string_lossy()),
-                            None => ()
+                            Blend::Downloaded(bf) => task.add_data("blendfile", &bf.path.to_string_lossy()),
+                            Blend::Optimized(bf) => task.add_data("blendfile", &bf.path.to_string_lossy()), // Should actually not happen
+                            Blend::None => ()
                         }
                     }
                   })

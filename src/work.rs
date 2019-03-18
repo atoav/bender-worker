@@ -2,12 +2,12 @@
 //! state of the program.
 
 use ::*;
+use blend::Blend;
 use config::WorkerConfig;
 use bender_job::{Task, History};
 use bender_mq::BenderMQ;
 use std::collections::HashMap;
 use chrono::{Utc, DateTime};
-use work::blendfiles::Blendfile;
 
 
 // Import work submodules
@@ -15,6 +15,7 @@ pub mod commands;
 pub mod blendfiles;
 pub mod requests;
 pub mod taskmanagment;
+pub mod optimize;
 pub mod ratelimit;
 
 use ratelimit::RateLimiter;
@@ -30,7 +31,7 @@ pub struct Work{
     pub tasks: Vec<Task>,
     pub current: Option<Task>,
     pub history: History,
-    pub blendfiles: HashMap<String, Option<Blendfile>>,
+    pub blendfiles: HashMap<String, Blend>,
     pub parent_jobs: HashMap<String, String>,
     command: Option<std::process::Child>,
     last_heartbeat: Option<DateTime<Utc>>,
@@ -52,7 +53,7 @@ impl Work{
             tasks: Vec::<Task>::new(),
             current: None,
             history: History::new(),
-            blendfiles: HashMap::<String, Option<Blendfile>>::new(),
+            blendfiles: HashMap::<String, Blend>::new(),
             parent_jobs: HashMap::<String, String>::new(),
             command: None,
             last_heartbeat: None,
@@ -91,6 +92,9 @@ impl Work{
         // disk and whose commands are not constructed yet
         self.construct_commands();
         // self.print_self("After construct_commands()");
+
+        // Optimize Blendfiles for local consumtion
+        self.optimize_blendfiles();
 
         // Update who the current Task is ("self.current")
         self.select_next_task(channel);

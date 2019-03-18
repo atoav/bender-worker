@@ -18,6 +18,11 @@ use chrono::prelude::*;
 use chrono::Duration;
 use itertools::Itertools;
 use bender_job::{Status, Task, Job, Command, FrameMap};
+use blend::Blend;
+
+
+
+
 
 
 
@@ -176,8 +181,8 @@ impl Work{
                             // Filter out jobs that are still within the grace period
                             .filter(|(_, entry)|{
                                 match entry{
-                                    Some(bf) => bf.is_over_grace_period(std::time::Duration::from_secs(self.config.grace_period)),
-                                    None => false
+                                    Blend::Optimized(bf) => bf.is_over_grace_period(std::time::Duration::from_secs(self.config.grace_period)),
+                                    _ => false
                                 }
                                 
                             })
@@ -299,7 +304,7 @@ impl Work{
                 .for_each(|id|{
                     let p = self.request_blendfile(id.to_owned());
                     // println!("{:?}", p);
-                    let opt_bf = if p.as_path().exists() { Some(Blendfile::new(p)) } else { None };
+                    let opt_bf = if p.as_path().exists() { Blend::Downloaded(Blendfile::new(p)) } else { Blend::None };
                     self.blendfiles.insert(id.to_string(), opt_bf);
                  });
 
@@ -339,10 +344,10 @@ impl Work{
                             None
                         }
                     };
-                    // Create a Blendfile from the Option<PathBuf>
+                    // Create a Blend Variant from the Option<PathBuf>
                     let opt_bf = match blendfile{
-                        Some(b) => Some(Blendfile::new(b)),
-                        None    => None
+                        Some(b) => Blend::Downloaded(Blendfile::new(b)),
+                        None    => Blend::None
                     };
                     self.blendfiles.insert(id.to_string(), opt_bf);
                  });
@@ -360,7 +365,7 @@ impl Work{
     pub fn add_blendfile<S, P>(&mut self, id: S, path: P) where S: Into<String>, P: Into<PathBuf> {
         let id = id.into();
         let path = path.into();
-        self.blendfiles.insert(id.clone(), Some(Blendfile::new(&path)));
+        self.blendfiles.insert(id.clone(), Blend::Downloaded(Blendfile::new(&path)));
         let h = format!("Worker [{}] stored blendfile [{}] at {}", 
             self.config.id, id.as_str(), path.to_string_lossy());
         self.add_history(h.as_str());
@@ -388,8 +393,8 @@ impl Work{
         match self.blendfiles.get(&t.parent_id){
             Some(ref blendfile) => {
                 match blendfile{
-                    Some(bf) => Some(bf.path.clone()),
-                    None => None
+                    Blend::Optimized(bf) => Some(bf.path.clone()),
+                    _ => None
                 }
             },
             None => None

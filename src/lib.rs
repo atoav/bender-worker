@@ -64,6 +64,9 @@ use work::*;
 
 pub mod command;
 
+pub mod blend;
+
+
 pub const APP_INFO: AppInfo = AppInfo{name: "bender-worker", author: "David Huss"};
 
 pub const USAGE: &str = "
