@@ -300,19 +300,29 @@ impl Work{
         if !ids.is_empty(){ 
             // For each remaining ID start a request and insert the resulting path
             // into the hashmap
-            ids.iter()
-                .for_each(|id|{
-                    let p = self.request_blendfile(id.to_owned());
-                    // println!("{:?}", p);
-                    let opt_bf = if p.as_path().exists() { Blend::Downloaded(Blendfile::new(p)) } else { Blend::None };
-                    self.blendfiles.insert(id.to_string(), opt_bf);
-                 });
+            if self.last_download.should_run(){
+                ids.iter()
+                    .for_each(|id|{
+                        match self.request_blendfile(id.to_owned()){
+                            Ok(path) => {
+                                // println!("{:?}", p);
+                                let opt_bf = if path.as_path().exists() { Blend::Downloaded(Blendfile::new(path)) } else { Blend::None };
+                                self.blendfiles.insert(id.to_string(), opt_bf);
+                                self.last_download.set_last();
+                            },
+                            Err(err) => {
+                                self.last_download.set_last_failed();
+                                errrun(format!("{}", err));
+                            }
+                        }
+                     });
 
-            // If the length of unique ids equals the length of entries containing \
-            // Some<Blendfile> in Work::blendfiles, we assume that all files have \
-            // been downloaded 
-            if  ids.len() == self.blendfiles.iter().map(|(_,x)| x).filter(|e|e.is_some()).count(){
-                okrun("Downloaded all blendfiles");
+                // If the length of unique ids equals the length of entries containing \
+                // Some<Blendfile> in Work::blendfiles, we assume that all files have \
+                // been downloaded 
+                if ids.len() == self.blendfiles.iter().map(|(_,x)| x).filter(|e|e.is_some()).count(){
+                    println!("{}", " ✔️ [WORKER] Downloaded all blendfiles".green());
+                }
             }
         }
     }

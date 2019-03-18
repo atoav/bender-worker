@@ -59,7 +59,10 @@ impl Work{
                            .map(|(id, blend)|{
                                 let path = blend.clone().unwrap().path;
                                 match optimize(path){
-                                    Ok(_) => Some((id.clone(), Blend::Optimized(blend.clone().unwrap()))),
+                                    Ok(_) => {
+                                        println!("{}", format!(" ✔️ [WORKER][      ][{}]          Optimized blendfile", &id[..6]).green());
+                                        Some((id.clone(), Blend::Optimized(blend.clone().unwrap())))
+                                    },
                                     Err(err) => {
                                         errrun(format!("Couldn't optimize blendfile for job [{}]: {}", &id[..6], err));
                                         None
@@ -124,13 +127,12 @@ fn run_with_python<S>(path: S, pythonpath: S) -> GenResult<String>where S: Into<
             .arg("--disable-autoexec")
             .arg("--python")
             .arg(pythonpath)
-            .spawn()?
-            .wait_with_output()?;
+            .output()?;
 
     // Collect all lines starting with "{" for JSON
     let output: String = String::from_utf8(command.stdout.clone())?
         .lines()
-        .filter(|line|line.trim().starts_with('{'))
+        // .inspect(|line| println!("{}", format!("INSPECTION: {}", line).bold().bright_blue()))
         .collect();
 
     // Error on empty string

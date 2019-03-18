@@ -38,4 +38,4 @@ if uses_cycles:
 
 
 # Overwrite the file
-# bpy.ops.wm.save_as_mainfile(filepath=bpy.data.filepath, copy=True)
+bpy.ops.wm.save_as_mainfile(filepath=bpy.data.filepath, copy=True)

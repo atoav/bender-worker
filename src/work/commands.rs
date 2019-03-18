@@ -104,10 +104,10 @@ impl Work{
                                                        .stderr(Stdio::piped())
                                                        .spawn(){
                                     Ok(c) => {
-                                        println!(" ⚟ [WORKER][{task_id}][{parent_id}][{short}] Dispatched Command", 
+                                        println!("{}", format!(" ⚟ [WORKER][{task_id}][{parent_id}][{short}] Dispatched Command", 
                                             task_id=&task.id[..6], 
                                             parent_id=&task.parent_id[..6],
-                                            short=task.command.short());
+                                            short=task.command.short()).yellow());
                                         self.command = Some(c);
                                         
                                         ExitStatus::Running
@@ -122,10 +122,10 @@ impl Work{
                                                        .stderr(Stdio::piped())
                                                        .spawn(){
                                     Ok(c) => {
-                                        println!(" ⚟ [WORKER][{task_id}][{parent_id}][{short}] Dispatched Command", 
+                                        println!("{}", format!(" ⚟ [WORKER][{task_id}][{parent_id}][{short}] Dispatched Command", 
                                             task_id=&task.id[..6], 
                                             parent_id=&task.parent_id[..6],
-                                            short=task.command.short());
+                                            short=task.command.short()).yellow());
                                         self.command = Some(c);
                                         
                                         ExitStatus::Running

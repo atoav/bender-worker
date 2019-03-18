@@ -35,6 +35,7 @@ pub struct Work{
     pub parent_jobs: HashMap<String, String>,
     command: Option<std::process::Child>,
     last_heartbeat: Option<DateTime<Utc>>,
+    last_download: RateLimiter,
     last_status: RateLimiter,
     last_upload: RateLimiter
 }
@@ -57,6 +58,7 @@ impl Work{
             parent_jobs: HashMap::<String, String>::new(),
             command: None,
             last_heartbeat: None,
+            last_download: RateLimiter::new(),
             last_status: RateLimiter::new(),
             last_upload: RateLimiter::new()
         }
@@ -94,7 +96,7 @@ impl Work{
         // self.print_self("After construct_commands()");
 
         // Optimize Blendfiles for local consumtion
-        // self.optimize_blendfiles();
+        self.optimize_blendfiles();
 
         // Update who the current Task is ("self.current")
         self.select_next_task(channel);

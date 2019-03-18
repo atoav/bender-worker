@@ -291,17 +291,17 @@ impl Work{
                                 if mode_is_independent{
                                     let mut url = bender_url.clone();
                                     url = url+"/job/"+&*task.parent_id.clone()+"/"+&*task.id.clone();
-                                    println!(" @ [WORKER][{task_id}][{parent_id}][{short}] Upload started", 
+                                    println!("{}", format!(" @ [WORKER][{task_id}][{parent_id}][{short}] Upload started", 
                                         task_id=&task.id[..6], 
                                         parent_id=&task.parent_id[..6], 
-                                        short=task.command.short());
+                                        short=task.command.short()).blue());
                                     match task.command.post_frames(url){
                                         Ok(mut responses) => {
                                             if responses[0].status().is_success(){
-                                                println!(" @ [WORKER][{task_id}][{parent_id}][{short}] Upload sucessful", 
+                                                println!("{}", format!(" ✔️ [WORKER][{task_id}][{parent_id}][{short}] Upload sucessful", 
                                                     task_id=&task.id[..6], 
                                                     parent_id=&task.parent_id[..6], 
-                                                    short=&task.command.short());
+                                                    short=&task.command.short()).blue());
                                                 if let Command::Blender(ref mut b) = task.command{
                                                     b.set_all_uploaded().unwrap();
                                                 }
