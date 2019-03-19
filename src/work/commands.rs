@@ -11,8 +11,9 @@ use std::fs::DirBuilder;
 
 #[cfg(unix)]
 use std::os::unix::fs::DirBuilderExt;
+
 #[cfg(unix)]
-use users::{Groups, UsersCache};
+use users::{UsersCache};
 
 
 

@@ -33,7 +33,7 @@ extern crate colored;
 extern crate console;
 extern crate reqwest;
 
-#[cfg(target_os = "linux")]
+#[cfg(unix)]
 extern crate users;
 
 extern crate bender_job;
