@@ -7,7 +7,7 @@ use std::io;
 use std::process::Command;
 use bender_job::common::tempfile::NamedTempFile;
 
-#[cfg(target_os = "linux")]
+#[cfg(unix)]
 use std::os::unix::fs::PermissionsExt;
 
 
@@ -144,9 +144,10 @@ fn run_with_python<S>(path: S, pythonpath: S) -> GenResult<String>where S: Into<
             Ok(meta) => {
                 // Set the permissions to 775
                 let mut permissions = meta.permissions();
-                if !cfg!(windows){
-                    permissions.set_mode(0o775);
-                }
+                
+                #[cfg(unix)]
+                permissions.set_mode(0o775);
+                
                 match fs::set_permissions(&path, permissions){
                     Ok(_) => (),
                     Err(err) => eprintln!("Error: failed to set permissions to 775: {}", err)

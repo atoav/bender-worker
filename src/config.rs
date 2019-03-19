@@ -10,7 +10,7 @@ use dialoguer::Input;
 use std::process::Command;
 use std::fs::DirBuilder;
 
-#[cfg(target_os = "linux")]
+#[cfg(unix)]
 use std::os::unix::fs::DirBuilderExt;
 
 // Default parameters
@@ -167,10 +167,10 @@ pub fn setup_blendpath<P>(config: &mut WorkerConfig, p: P) -> GenResult<()> wher
     // Create frames directory with 775 permissions on Unix
     let mut builder = DirBuilder::new();
 
-    if !cfg!(windows){
-        // Set the permissions to 775
-        builder.mode(0o2775);
-    }
+    // Set the permissions to 775
+    #[cfg(unix)]
+    builder.mode(0o2775);
+    
     builder.recursive(true)
            .create(&config.blendpath)?;
 
@@ -199,6 +199,7 @@ pub fn setup_outpath<P>(config: &mut WorkerConfig, p: P) -> GenResult<()> where 
 
     if !cfg!(windows){
         // Set the permissions to 775
+        #[cfg(target_os = "unix")]
         builder.mode(0o2775);
     }
     builder.recursive(true)

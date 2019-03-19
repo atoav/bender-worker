@@ -3,7 +3,7 @@ use config::WorkerConfig;
 use bender_mq::BenderMQ;
 use std::fs::DirBuilder;
 
-#[cfg(target_os = "linux")]
+#[cfg(unix)]
 use std::os::unix::fs::DirBuilderExt;
 
 
@@ -204,10 +204,10 @@ fn delete_framesfolder(config: &WorkerConfig){
                 // Create frames directory with 775 permissions on Unix
                 let mut builder = DirBuilder::new();
 
-                if !cfg!(windows){
-                    // Set the permissions to 775
-                    builder.mode(0o2775);
-                }
+                // Set the permissions to 775
+                #[cfg(unix)]
+                builder.mode(0o2775);
+                
                 match builder.recursive(true).create(&p){
                     Ok(_) => println!("Recreated directory {} with permission 2775", &*p.to_string_lossy()),
                     Err(err) => eprintln!(" ✖ [WORKER] Error: Couldn't recreate Directory {}", err)

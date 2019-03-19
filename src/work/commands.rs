@@ -9,9 +9,9 @@ use std::process::Command;
 use std::time::Duration;
 use std::fs::DirBuilder;
 
-#[cfg(target_os = "linux")]
+#[cfg(unix)]
 use std::os::unix::fs::DirBuilderExt;
-#[cfg(target_os = "linux")]
+#[cfg(unix)]
 use users::{Groups, UsersCache};
 
 
@@ -43,12 +43,14 @@ impl Work{
 
                         if !cfg!(windows){
                             // Set the permissions to 775
+                            #[cfg(unix)]
                             match builder.mode(0o2775).recursive(true).create(&out){
                                 Ok(_) => (), // println!("Created directory {} with permission 2775", &out.to_string_lossy()),
                                 Err(err) => eprintln!(" ✖ [WORKER] Error: Couldn't create Directory {}", err)
                             } 
                         } else {
                             // Set the permissions to 775
+                            #[cfg(unix)]
                             match builder.recursive(true).create(&out){
                                 Ok(_) => (), // println!("Created directory {}", &out.to_string_lossy()),
                                 Err(err) => eprintln!(" ✖ [WORKER] Error: Couldn't create Directory {}", err)
@@ -91,7 +93,7 @@ impl Work{
                         Some(args) => {
                             // If we are in server mode assume we run linux and set the output spawn
                             // with gid "bender"
-                            if self.config.mode.is_server() && !cfg!(windows){
+                            if self.config.mode.is_server() && cfg!(unix){
                                 use std::os::unix::process::CommandExt;
                                 // Get bender gid when we are on a server
                                 let mut cache = UsersCache::new();
