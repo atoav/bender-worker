@@ -13,7 +13,7 @@ use std::fs::DirBuilder;
 use std::os::unix::fs::DirBuilderExt;
 
 #[cfg(unix)]
-use users::{UsersCache};
+use users::{Groups, UsersCache};
 
 
 
