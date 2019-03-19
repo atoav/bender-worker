@@ -7,12 +7,12 @@ use std::process::{Stdio};
 use std::io::{BufRead, BufReader};
 use std::process::Command;
 use std::time::Duration;
-use users::{Groups, UsersCache};
 use std::fs::DirBuilder;
 
 #[cfg(target_os = "linux")]
 use std::os::unix::fs::DirBuilderExt;
-
+#[cfg(target_os = "linux")]
+use users::{Groups, UsersCache};
 
 
 

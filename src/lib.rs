@@ -32,6 +32,8 @@ extern crate docopt;
 extern crate colored;
 extern crate console;
 extern crate reqwest;
+
+#[cfg(target_os = "linux")]
 extern crate users;
 
 extern crate bender_job;
