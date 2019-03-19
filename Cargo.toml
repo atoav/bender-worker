@@ -1,6 +1,6 @@
 [package]
 name = "bender_worker"
-version = "0.2.10"
+version = "0.2.11"
 license = "MIT"
 readme = "README.md"
 authors = ["David Huss <dh@widerstandzwecklos.at>"]
