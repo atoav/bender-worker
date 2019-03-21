@@ -193,13 +193,26 @@ impl Work{
                             Err(err) => { errrun(format!("{}", err)); false }
                         }
                       })
-                      .for_each(|task| {
-                        if let Command::Blender(ref mut blender_command)  = task.command{
-                            match blender_command.get_frame_filesizes(){
-                                Ok(_)    => (),
-                                Err(err) => errrun(format!("Couldn't get Filesize for Frame: {}", err))
+                      .filter_map(|task| {
+                            let got_stat = if let Command::Blender(ref mut blender_command)  = task.command{
+                                match blender_command.get_frame_filesizes(){
+                                    Ok(_)    => true,
+                                    Err(err) => {
+                                        errrun(format!("Couldn't get Filesize for Frame: {}", err));
+                                        false
+                                    }
+                                }
+                            }else{ false };
+                            // Return Option
+                            if got_stat{ Some(task) } else { None }
+                      })
+                      .for_each(|task|{
+                            // Post the updated Task Info
+                            let routing_key = format!("stat.{}", task.parent_id);
+                            match task.serialize_to_u8(){
+                                Ok(task_json) => channel.worker_post(routing_key, task_json),
+                                Err(err) => eprintln!(" ✖ [WORKER] Error: Failed ot deserialize Task {}: {}", task.id, err)
                             }
-                        }
                       });
 
             // Generate hash for frames without it
@@ -213,41 +226,27 @@ impl Work{
                             Err(err) => { errrun(format!("{}", err)); false }
                         }
                       })
-                      .for_each(|task| {
-                        if let Command::Blender(ref mut blender_command)  = task.command{
-                            match blender_command.get_frame_hashes(){
-                                Ok(_)    => (),
-                                Err(err) => errrun(format!("Couldn't get Filesize for Frame: {}", err))
-                            }
-                        }
-                      });
-
-            self.tasks.iter()
-                      .filter(|task|task.is_finished())
-                      .filter(|task|{
-                        // Filter out any task whose command isn't a blender \
-                        // command and whose frames have not been hashed yet 
-                        match task.command.all_hashed(){
-                            Ok(bol)  => bol,
-                            Err(err) => { errrun(format!("{}", err)); false }
-                        }
-                      })
-                      .filter(|task|{
-                        // Filter out any task whose command isn't a blender \
-                        // command and whose frames have no filesize yet 
-                        match task.command.all_filesize(){
-                            Ok(bol)  => bol,
-                            Err(err) => { errrun(format!("{}", err)); false }
-                        }
+                      .filter_map(|task| {
+                            let got_stat = if let Command::Blender(ref mut blender_command)  = task.command{
+                                match blender_command.get_frame_hashes(){
+                                    Ok(_)    => true,
+                                    Err(err) => {
+                                        errrun(format!("Couldn't get Filesize for Frame: {}", err));
+                                        false
+                                    }
+                                }
+                            }else{ false };
+                            // Return Option
+                            if got_stat{ Some(task) } else { None }
                       })
                       .for_each(|task|{
-                        // Post the updated Task Info
-                        let routing_key = format!("stat.{}", self.config.id);
-                        match task.serialize_to_u8(){
-                            Ok(task_json) => channel.worker_post(routing_key, task_json),
-                            Err(err) => eprintln!(" ✖ [WORKER] Error: Failed ot deserialize Task {}: {}", task.id, err)
-                        }
-                      })
+                            // Post the updated Task Info
+                            let routing_key = format!("stat.{}", task.parent_id);
+                            match task.serialize_to_u8(){
+                                Ok(task_json) => channel.worker_post(routing_key, task_json),
+                                Err(err) => eprintln!(" ✖ [WORKER] Error: Failed ot deserialize Task {}: {}", task.id, err)
+                            }
+                      });
         }
     }
 
